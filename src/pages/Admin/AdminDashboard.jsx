@@ -11,7 +11,7 @@ import {
 } from '@ant-design/icons';
 import UserManagement from '../../components/Admin/UserManagement';
 import SystemAnalytics from '../../components/Admin/SystemAnalytics';
-
+import SystemSettings from '../../components/Admin/SystemSettings';
 const { Title } = Typography;
 const { TabPane } = Tabs;
 
@@ -139,7 +139,7 @@ const AdminDashboard = () => {
             </div>
           </Card>
         </Col>
-        <Col xs={24} sm={12} lg={6}>
+        {/* <Col xs={24} sm={12} lg={6}>
           <Card>
             <Statistic
               title="Sức Khỏe Hệ Thống"
@@ -152,7 +152,7 @@ const AdminDashboard = () => {
               <CheckCircleOutlined /> Tất cả dịch vụ ổn định
             </div>
           </Card>
-        </Col>
+        </Col> */}
       </Row>
 
       <Tabs defaultActiveKey="overview">
@@ -168,7 +168,7 @@ const AdminDashboard = () => {
                 />
               </Card>
             </Col>
-            <Col xs={24} lg={8}>
+            {/* <Col xs={24} lg={8}>
               <Card title="Thống Kê Nhanh">
                 <div style={{ marginBottom: 16 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -198,7 +198,7 @@ const AdminDashboard = () => {
                   </div>
                 </div>
               </Card>
-            </Col>
+            </Col> */}
           </Row>
         </TabPane>
 
@@ -206,29 +206,12 @@ const AdminDashboard = () => {
           <UserManagement />
         </TabPane>
 
-        <TabPane tab="Phân Tích Hệ Thống" key="analytics">
+        {/* <TabPane tab="Phân Tích Hệ Thống" key="analytics">
           <SystemAnalytics />
-        </TabPane>
+        </TabPane> */}
 
         <TabPane tab="Cài Đặt" key="settings">
-          <Card title="Cài Đặt Hệ Thống">
-            <Row gutter={[16, 16]}>
-              <Col span={24}>
-                <Card type="inner" title="Cài đặt chung" size="small">
-                  <p>Phiên bản hệ thống: 2.1.0</p>
-                  <p>Ngày cập nhật: 2024-01-15</p>
-                  <p>Trạng thái: <Tag color="green">Đang hoạt động</Tag></p>
-                </Card>
-              </Col>
-              <Col span={24}>
-                <Card type="inner" title="Bảo mật" size="small">
-                  <p>Xác thực 2 yếu tố: <Tag color="green">Đã bật</Tag></p>
-                  <p>SSL/TLS: <Tag color="green">Đã bật</Tag></p>
-                  <p>Firewall: <Tag color="green">Đang chạy</Tag></p>
-                </Card>
-              </Col>
-            </Row>
-          </Card>
+          <SystemSettings />
         </TabPane>
       </Tabs>
     </div>

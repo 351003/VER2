@@ -1,3 +1,4 @@
+//Phân tích hệ thống
 import React, { useState, useEffect } from 'react';
 import { Row, Col, Card, Statistic, Table, Tag, Progress, List, Typography } from 'antd';
 import { 

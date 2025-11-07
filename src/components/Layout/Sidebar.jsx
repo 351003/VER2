@@ -25,82 +25,140 @@ const Sidebar = ({ collapsed }) => {
     token: { colorBgContainer },
   } = theme.useToken();
   const [openKeys, setOpenKeys] = useState([]);
-  const menuItems = [
-    {
-      key: '/dashboard',
-      icon: <DashboardOutlined />,
-      label: 'Dashboard',
-    },
-    {
-      key: '/tasks',
-      icon: <CheckCircleOutlined />,
-      label: 'Công Việc',
-      children: [
-        {
-          key: '/tasks/personal',
-          label: 'Cá Nhân',
-        },
-        {
-          key: '/tasks/team',
-          label: 'Nhóm',
-        },
-      ],
-    },
-    {
-      key: '/projects',
-      icon: <ProjectOutlined />,
-      label: 'Dự Án',
-    },
-    {
-      key: '/teams',
-      icon: <TeamOutlined />,
-      label: 'Nhóm',
-    },
-    {
-      key: '/calendar',
-      icon: <CalendarOutlined />,
-      label: 'Lịch',
-    },
-];
+    let menuItems = [];
+
+  // Nếu là admin
+  if (user?.role === 'admin') {
+    menuItems = [
+      {
+        key: '/admin',
+        icon: <SettingOutlined />,
+        label: 'Quản Trị Hệ Thống',
+      },
+    ];
+  }
+  // Nếu là manager
+  else if (user?.role === 'manager') {
+    menuItems = [
+      {
+        key: '/dashboard',
+        icon: <DashboardOutlined />,
+        label: 'Dashboard',
+      },
+      {
+        key: '/tasks/team',
+        icon: <CheckCircleOutlined />,
+        label: 'Công việc nhóm',
+        
+      },
+      {
+        key: '/projects',
+        icon: <ProjectOutlined />,
+        label: 'Dự Án',
+      },
+      {
+        key: '/teams',
+        icon: <TeamOutlined />,
+        label: 'Nhóm',
+      },
+      {
+        key: '/calendar',
+        icon: <CalendarOutlined />,
+        label: 'Lịch',
+      },
+      {
+        key: '/reports',
+        icon: <BarChartOutlined />,
+        label: 'Báo Cáo',
+      },
+    ];
+  }
+  // Nếu là user thường
+  else {
+    menuItems = [
+      {
+        key: '/dashboard',
+        icon: <DashboardOutlined />,
+        label: 'Dashboard',
+      },
+      {
+        key: '/tasks',
+        icon: <CheckCircleOutlined />,
+        label: 'Công Việc',
+        children: [
+          {
+            key: '/tasks/personal',
+            label: 'Cá Nhân',
+          },
+          {
+            key: '/tasks/team',
+            label: 'Nhóm',
+          },
+        ],
+      },
+      {
+        key: '/projects',
+        icon: <ProjectOutlined />,
+        label: 'Dự Án',
+      },
+      {
+        key: '/teams',
+        icon: <TeamOutlined />,
+        label: 'Nhóm',
+      },
+      {
+        key: '/calendar',
+        icon: <CalendarOutlined />,
+        label: 'Lịch',
+      },
+      {
+        key: '/personalreports',
+        icon: <BarChartOutlined />,
+        label: 'Báo Cáo Cá Nhân',
+      },
+    ];
+  }
+
     const onOpenChange = (keys) => {
         // Chỉ cho phép mở 1 dropdown tại một thời điểm
         const latestOpenKey = keys.find((key) => openKeys.indexOf(key) === -1);
         setOpenKeys(latestOpenKey ? [latestOpenKey] : []);
     };
-    // Thêm menu Reports chỉ cho manager và admin
-  if (hasPermission('view_team_reports') || hasPermission('view_system_reports')) {
-    menuItems.push({
-      key: '/reports',
-      icon: <BarChartOutlined />,
-      label: 'Báo Cáo',
-    });
-  }
+  //   // Thêm menu Reports chỉ cho manager và admin
+  // if (hasPermission('view_team_reports')) {
+  //   menuItems.push({
+  //     key: '/reports',
+  //     icon: <BarChartOutlined />,
+  //     label: 'Báo Cáo',
+  //   });
+  // }
+  // // ---  Giới hạn hiển thị nếu là admin ---
+  // if (user?.role === 'admin') {
+  //   menuItems = menuItems.filter(
+  //     (item) =>
+  //       item.key === '/dashboard' ||
+  //       item.key === '/admin' ||
+  //       item.key === '/reports'
+  //   );
+  // }
+  // if (hasPermission('view_own_reports')) {
+  //   menuItems.push({
+  //     key: '/personalreports',
+  //     icon: <BarChartOutlined />,
+  //     label: 'Báo Cáo',
+  //   });
+  // }
 
-  if (hasPermission('view_own_reports')) {
-    menuItems.push({
-      key: '/personalreports',
-      icon: <BarChartOutlined />,
-      label: 'Báo Cáo',
-    });
-  }
+  // // Thêm menu Admin chỉ cho admin
+  // if (user?.role === 'admin') {
+  //   menuItems.push({
+  //     key: '/admin',
+  //     icon: <SettingOutlined />,
+  //     label: 'Quản Trị',
+  //   });
+  // }
 
-  // Thêm menu Admin chỉ cho admin
-  if (user?.role === 'admin') {
-    menuItems.push({
-      key: '/admin',
-      icon: <SettingOutlined />,
-      label: 'Quản Trị',
-    });
-  }
 
-//   // Thêm menu Admin chỉ cho admin
-//   if (user?.role === 'admin') {
-//     menuItems.push({
-//       key: '/admin',
-//       icon: <SettingOutlined />,
-//       label: 'Quản Trị',
-//     });
-//   }
 
   const handleMenuClick = ({ key }) => {
     navigate(key);

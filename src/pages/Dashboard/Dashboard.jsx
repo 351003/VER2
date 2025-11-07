@@ -8,8 +8,11 @@ import {
 } from '@ant-design/icons';
 import StatCard from '../../components/Common/StatCard';
 import ChartCard from '../../components/Common/ChartCard';
+import { useAuth } from '../../contexts/AuthContext';
 
 const Dashboard = () => {
+  const { user } = useAuth();// Lấy thông tin user từ context
+  const userRole = user?.role || 'guest';
   const recentActivities = [
     {
       id: 1,
@@ -59,7 +62,7 @@ const Dashboard = () => {
               value={24}
               icon={<CheckCircleOutlined />}
               color="#1890ff"
-              change="+12%"
+              // change="+12%"
             />
           </Col>
           <Col xs={24} sm={12} lg={6}>
@@ -68,7 +71,7 @@ const Dashboard = () => {
               value={8}
               icon={<ClockCircleOutlined />}
               color="#faad14"
-              change="+3%"
+              // change="+3%"
             />
           </Col>
           <Col xs={24} sm={12} lg={6}>
@@ -77,7 +80,7 @@ const Dashboard = () => {
               value={16}
               icon={<TeamOutlined />}
               color="#52c41a"
-              change="+8%"
+              // change="+8%"
             />
           </Col>
           <Col xs={24} sm={12} lg={6}>
@@ -86,7 +89,7 @@ const Dashboard = () => {
               value="86%"
               icon={<RiseOutlined />}
               color="#722ed1"
-              change="+5%"
+              // change="+5%"
             />
           </Col>
         </Row>
@@ -102,6 +105,7 @@ const Dashboard = () => {
               type="doughnut"
             />
           </Col>
+          {(userRole === 'manager') && (
           <Col xs={24} lg={12}>
             <Card title="Project Progress" bordered={false}>
               <div style={{ marginBottom: 16 }}>
@@ -127,10 +131,12 @@ const Dashboard = () => {
               </div>
             </Card>
           </Col>
+          )}
         </Row>
 
         {/* Recent Activities */}
         <Row gutter={[24, 24]} style={{ marginTop: 24 }}>
+          {( userRole === 'manager') && (
           <Col xs={24} lg={12}>
             <Card title="Recent Activities" bordered={false}>
               <List
@@ -166,8 +172,9 @@ const Dashboard = () => {
               />
             </Card>
           </Col>
+          )}
           
-          <Col xs={24} lg={12}>
+          <Col xs={24} lg={(userRole === 'manager') ? 12 : 24}>
             <Card title="Upcoming Deadlines" bordered={false}>
               <List
                 dataSource={[

@@ -18,6 +18,7 @@ import {
   SettingOutlined,
   CrownOutlined,
 } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import NotificationList from '../Notifications/NotificationList';
@@ -27,6 +28,7 @@ const { Header: AntHeader } = Layout;
 const Header = ({ collapsed, onToggle }) => {
   const { user, logout } = useAuth();
   const { unreadCount } = useNotifications();
+  const navigate = useNavigate();
   const [notificationDropdownVisible, setNotificationDropdownVisible] = useState(false);
   const {
     token: { colorBgContainer },
@@ -63,7 +65,6 @@ const Header = ({ collapsed, onToggle }) => {
         key: 'logout',
         icon: <LogoutOutlined />,
         label: 'Đăng xuất',
-        onClick: logout,
       }
     );
 
@@ -90,6 +91,9 @@ const Header = ({ collapsed, onToggle }) => {
   return (
     <AntHeader
       style={{
+        position: 'sticky',     // 🟢 Giữ header cố định khi cuộn
+        top: 0,                 // 🟢 Dính sát mép trên
+        zIndex: 1000, 
         padding: '0 24px',
         background: colorBgContainer,
         display: 'flex',
@@ -145,7 +149,18 @@ const Header = ({ collapsed, onToggle }) => {
         </Dropdown>
         
         {/* User Profile Dropdown */}
-        <Dropdown menu={{ items: getUserMenuItems() }} placement="bottomRight">
+        <Dropdown
+          menu={{
+            items: getUserMenuItems(),
+            onClick: ({ key }) => {
+              if (key === 'profile') navigate('/profile');
+              else if (key === 'settings') navigate('/profile');
+              else if (key === 'admin') navigate('/admin');
+              else if (key === 'logout') logout();
+            }
+          }}
+          placement="bottomRight"
+        >
           <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
             <Avatar 
               size="default" 

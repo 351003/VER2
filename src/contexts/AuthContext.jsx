@@ -43,11 +43,10 @@ export const AuthProvider = ({ children }) => {
           role: 'admin',
           avatar: null,
           permissions: [
-            'all',
-            'create_project', 'edit_project', 'delete_project',
-            'create_team', 'edit_team', 'delete_team',
-            'manage_users', 'view_reports', 'view_admin'
-          ]
+            // 'all',
+          
+            'manage_users', 'view_team_reports', 'view_admin'
+          ]//'create_project', 'edit_project', 'delete_project','create_team', 'edit_team', 'delete_team',
         };
       } else if (email === 'user@example.com' && password === 'password') {
         userData = {
