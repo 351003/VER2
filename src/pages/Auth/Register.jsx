@@ -23,7 +23,7 @@ const Register = () => {
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+      background: 'linear-gradient(135deg, #e34a70ff 0%, #b8085df6 100%)'
     }}>
       <Card
         title="Đăng Ký Tài Khoản"

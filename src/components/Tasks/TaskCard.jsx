@@ -10,7 +10,7 @@ import {
   MenuOutlined,
 } from '@ant-design/icons';
 
-const TaskCard = ({ task, onEdit, onDelete, showStatusTag = false }) => {
+const TaskCard = ({ task, onEdit, onDelete, showStatusTag = false }) => { //showAssignee = true
   const getPriorityColor = (priority) => {
     const colors = {
       high: 'red',
@@ -133,6 +133,7 @@ const TaskCard = ({ task, onEdit, onDelete, showStatusTag = false }) => {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
           <Space size="small">
+            {/* {showAssignee && ( */}
             {task.assignee ? (
               <Tooltip title={task.assignee.name}>
                 <Avatar size="small" src={task.assignee.avatar} icon={<UserOutlined />} />
@@ -141,7 +142,8 @@ const TaskCard = ({ task, onEdit, onDelete, showStatusTag = false }) => {
               <Tag icon={<UserOutlined />} color="default" style={{ fontSize: '10px', margin: 0 }}>
                 Chưa PC
               </Tag>
-            )}
+            )
+            }
             
             <Tag color={getPriorityColor(task.priority)} style={{ margin: 0, fontSize: '10px' }}>
               <FlagOutlined /> {task.priority === 'high' ? 'Cao' : task.priority === 'medium' ? 'TB' : 'Thấp'}

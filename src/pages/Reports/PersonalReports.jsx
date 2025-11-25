@@ -87,7 +87,7 @@ const PersonalReports = () => {
             />
           </Card>
         </Col>
-        <Col xs={24} sm={12} lg={6}>
+        {/* <Col xs={24} sm={12} lg={6}>
           <Card>
             <Statistic
               title="Tỷ lệ hoàn thành"
@@ -97,7 +97,7 @@ const PersonalReports = () => {
               valueStyle={{ color: '#faad14' }}
             />
           </Card>
-        </Col>
+        </Col> */}
         <Col xs={24} sm={12} lg={6}>
           <Card>
             <Statistic
@@ -119,10 +119,10 @@ const PersonalReports = () => {
                 <span>Hoàn thành</span>
                 <span>{personalStats.completedTasks}/{personalStats.totalTasks}</span>
               </div>
-              <Progress 
-                percent={personalStats.completionRate} 
+              {/* <Progress 
+                // percent={personalStats.completionRate} 
                 strokeColor="#52c41a"
-              />
+              /> */}
             </div>
             
             <div style={{ marginBottom: 16 }}>
@@ -163,7 +163,7 @@ const PersonalReports = () => {
         </Col>
       </Row>
 
-      {/* Performance Summary */}
+      {/* Performance Summary
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
         <Col span={24}>
           <Card title="Tóm Tắt Hiệu Suất">
@@ -204,7 +204,7 @@ const PersonalReports = () => {
             </Row>
           </Card>
         </Col>
-      </Row>
+      </Row> */}
     </div>
   );
 };

@@ -298,6 +298,7 @@ const handleTaskMove = (taskId, newStatus) => {
           onEditTask={handleEditTask}
           onDeleteTask={handleDeleteTask}
           onTaskMove={handleTaskMove}
+          
         />
       ) : (
         <Row gutter={[16, 16]}>
@@ -316,6 +317,7 @@ const handleTaskMove = (taskId, newStatus) => {
                   onEdit={handleEditTask}
                   onDelete={handleDeleteTask}
                   showStatusTag={true}
+                  
                 />
               </Col>
             ))
@@ -338,7 +340,7 @@ const handleTaskMove = (taskId, newStatus) => {
           onFinish={handleFormFinish}
           initialValues={editingTask}
           loading={loading}
-          users={users}
+          showAssignee={false}
         />
       </Modal>
     </div>

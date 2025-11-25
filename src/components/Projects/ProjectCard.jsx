@@ -93,7 +93,7 @@ const ProjectCard = ({ project, onView, onEdit, onDelete }) => {
   ];
 
   // Chỉ thêm edit action nếu có quyền
-  if (onEdit && hasPermission('edit_project')) {
+  if (onEdit && hasPermission('edit_projects')) {
     actions.push(
       <Tooltip title="Chỉnh sửa">
         <EditOutlined 

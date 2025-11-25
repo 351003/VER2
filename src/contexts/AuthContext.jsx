@@ -43,7 +43,7 @@ export const AuthProvider = ({ children }) => {
           role: 'admin',
           avatar: null,
           permissions: [
-            // 'all',
+            'all',
           
             'manage_users', 'view_team_reports', 'view_admin'
           ]//'create_project', 'edit_project', 'delete_project','create_team', 'edit_team', 'delete_team',
@@ -70,7 +70,7 @@ export const AuthProvider = ({ children }) => {
           permissions: [
             'view_tasks', 'create_tasks', 'edit_tasks', 'delete_tasks',
             'view_projects', 'create_projects', 'edit_projects', 'view_teams',
-            'create_teams', 'edit_teams', 'view_calendar', 'view_team_reports',
+            'create_teams', 'edit_teams', 'create_calendar', 'view_calendar', 'view_team_reports',
             'manage_team_tasks'
           ]
         };

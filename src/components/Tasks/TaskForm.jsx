@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 const { Option } = Select;
 const { TextArea } = Input;
 
-const TaskForm = ({ visible, onCancel, onFinish, initialValues, loading, users = [] }) => {
+const TaskForm = ({ visible, onCancel, onFinish, initialValues, loading, users = [], showAssignee = true }) => {
   const [form] = Form.useForm();
 
   useEffect(() => {
@@ -78,7 +78,7 @@ const TaskForm = ({ visible, onCancel, onFinish, initialValues, loading, users =
           <Option value="done">Hoàn thành</Option>
         </Select>
       </Form.Item>
-
+    {showAssignee && (
       <Form.Item
         name="assigneeId"
         label="Người phụ trách"
@@ -99,7 +99,7 @@ const TaskForm = ({ visible, onCancel, onFinish, initialValues, loading, users =
           ))}
         </Select>
       </Form.Item>
-
+      )}
       <Form.Item
         name="dueDate"
         label="Hạn hoàn thành"

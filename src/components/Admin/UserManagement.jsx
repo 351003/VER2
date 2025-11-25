@@ -28,20 +28,20 @@ const UserManagement = () => {
     setLoading(true);
     // Mock users data
     const mockUsers = [
+      // {
+      //   id: 1,
+      //   name: 'Nguyễn Văn Admin',
+      //   email: 'admin@company.com',
+      //   role: 'admin',
+      //   status: 'active',
+      //   avatar: null,
+      //   lastLogin: '2024-01-20 14:30:00',
+      //   createdAt: '2024-01-01',
+      //   projects: 12,
+      //   tasks: 45
+      // },
       {
         id: 1,
-        name: 'Nguyễn Văn Admin',
-        email: 'admin@company.com',
-        role: 'admin',
-        status: 'active',
-        avatar: null,
-        lastLogin: '2024-01-20 14:30:00',
-        createdAt: '2024-01-01',
-        projects: 12,
-        tasks: 45
-      },
-      {
-        id: 2,
         name: 'Trần Thị Manager',
         email: 'manager@company.com',
         role: 'manager',
@@ -53,7 +53,7 @@ const UserManagement = () => {
         tasks: 32
       },
       {
-        id: 3,
+        id: 2,
         name: 'Lê Văn User',
         email: 'user@company.com',
         role: 'user',
@@ -65,10 +65,10 @@ const UserManagement = () => {
         tasks: 18
       },
       {
-        id: 4,
+        id: 3,
         name: 'Phạm Thị Guest',
-        email: 'guest@company.com',
-        role: 'guest',
+        email: 'test@company.com',
+        role: 'user',
         status: 'inactive',
         avatar: null,
         lastLogin: '2024-01-15 11:20:00',
@@ -77,7 +77,7 @@ const UserManagement = () => {
         tasks: 8
       },
       {
-        id: 5,
+        id: 4,
         name: 'Hoàng Văn Developer',
         email: 'dev@company.com',
         role: 'user',
@@ -222,7 +222,7 @@ const UserManagement = () => {
             />
           </Tooltip>
 
-          <Popconfirm
+          {/* <Popconfirm
             title="Xóa người dùng"
             description="Bạn có chắc chắn muốn xóa người dùng này?"
             onConfirm={() => handleDeleteUser(record.id)}
@@ -233,7 +233,7 @@ const UserManagement = () => {
             <Tooltip title="Xóa">
               <Button type="link" danger icon={<DeleteOutlined />} />
             </Tooltip>
-          </Popconfirm>
+          </Popconfirm> */}
         </Space>
       ),
     },

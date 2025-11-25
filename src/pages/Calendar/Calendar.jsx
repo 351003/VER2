@@ -23,7 +23,7 @@ import {
 } from '@ant-design/icons';
 import CalendarView from '../../components/Calendar/CalendarView';
 import EventForm from '../../components/Calendar/EventForm';
-
+import PermissionWrapper from '../../components/Common/PermissionWrapper';
 const { Title } = Typography;
 const { TabPane } = Tabs;
 
@@ -209,6 +209,7 @@ const CalendarPage = () => {
               Quản lý lịch trình và sự kiện của bạn
             </p>
           </div>
+          <PermissionWrapper permission="create_calendar">
           <Button
             type="primary"
             icon={<PlusOutlined />}
@@ -216,6 +217,7 @@ const CalendarPage = () => {
           >
             Tạo Sự Kiện
           </Button>
+          </PermissionWrapper>
         </div>
       </Card>
 

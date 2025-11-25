@@ -210,7 +210,7 @@ const Projects = () => {
   };
 
   const handleUpdateProject = (values) => {
-    if (!hasPermission('edit_project')) {
+    if (!hasPermission('edit_projects')) {
       message.error('Bạn không có quyền chỉnh sửa dự án!');
       return;
     }
@@ -292,7 +292,7 @@ const Projects = () => {
             </p>
           </div>
 
-          <PermissionWrapper permission="create_project">
+          <PermissionWrapper permission="create_projects">
           <Button
             type="primary"
             icon={<PlusOutlined />}
@@ -456,7 +456,7 @@ const Projects = () => {
               <ProjectCard
                 project={project}
                 onView={handleViewProject}
-                onEdit={hasPermission('edit_project') ? handleEditProject : undefined}
+                onEdit={hasPermission('edit_projects') ? handleEditProject : undefined}
                 onDelete={hasPermission('delete_project') ? handleDeleteProject : undefined}
               />
             </Col>

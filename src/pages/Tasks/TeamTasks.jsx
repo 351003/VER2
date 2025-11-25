@@ -271,6 +271,7 @@ const TeamTasks = () => {
           initialValues={editingTask}
           loading={loading}
           users={users}
+          showAssignee={true}
         />
       </Modal>
     </div>

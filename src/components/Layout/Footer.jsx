@@ -33,9 +33,9 @@ const Footer = () => {
           </Link>
         </Space>
 
-        <Text type="secondary" style={{ fontSize: 12 }}>
+        {/* <Text type="secondary" style={{ fontSize: 12 }}>
           Thiết kế & phát triển bởi <strong>Nguyễn Thu Huyền</strong> — Lớp D21CQCN01-B, PTIT.
-        </Text>
+        </Text> */}
       </Space>
     </AntFooter>
   );
