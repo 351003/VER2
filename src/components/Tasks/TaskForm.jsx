@@ -6,29 +6,98 @@ import dayjs from 'dayjs';
 const { Option } = Select;
 const { TextArea } = Input;
 
-const TaskForm = ({ visible, onCancel, onFinish, initialValues, loading, users = [], showAssignee = true }) => {
+// const TaskForm = ({ visible, onCancel, onFinish, initialValues, loading, users = [], showAssignee = true }) => {
+//   const [form] = Form.useForm();
+
+//   useEffect(() => {
+//     if (visible) {
+//       if (initialValues) {
+//         form.setFieldsValue({
+//           ...initialValues,
+//           dueDate: initialValues.dueDate ? dayjs(initialValues.dueDate) : null
+//         });
+//       } else {
+//         form.resetFields();
+//       }
+//     }
+//   }, [visible, initialValues, form]);
+
+//   const handleFinish = (values) => {
+//     onFinish({
+//       ...values,
+//       dueDate: values.dueDate ? values.dueDate.format('YYYY-MM-DD') : null
+//     });
+//   };
+
+const TaskForm = ({ 
+  visible, 
+  onCancel, 
+  onFinish, 
+  initialValues, 
+  loading, 
+  users = [],
+  showAssignee = true 
+}) => {
   const [form] = Form.useForm();
 
   useEffect(() => {
     if (visible) {
       if (initialValues) {
-        form.setFieldsValue({
-          ...initialValues,
-          dueDate: initialValues.dueDate ? dayjs(initialValues.dueDate) : null
-        });
+        // Map dữ liệu từ backend sang form fields
+        const formValues = {
+          title: initialValues.title,
+          content: initialValues.content,
+          status: initialValues.status,
+          timeStart: initialValues.timeStart ? dayjs(initialValues.timeStart) : null,
+          timeFinish: initialValues.timeFinish ? dayjs(initialValues.timeFinish) : null,
+          priority: initialValues.priority || 'medium',
+          tags: initialValues.tags || []
+        };
+
+        if (showAssignee && initialValues.assigneeId) {
+          formValues.assigneeId = initialValues.assigneeId;
+        } else if (showAssignee && initialValues.assignee) {
+          formValues.assigneeId = initialValues.assignee.id;
+        }
+
+        form.setFieldsValue(formValues);
       } else {
         form.resetFields();
+        // Set default values for new task
+        form.setFieldsValue({
+          status: 'todo',
+          priority: 'medium'
+        });
       }
     }
-  }, [visible, initialValues, form]);
+  }, [visible, initialValues, form, showAssignee]);
 
   const handleFinish = (values) => {
-    onFinish({
-      ...values,
-      dueDate: values.dueDate ? values.dueDate.format('YYYY-MM-DD') : null
-    });
-  };
+    // Format data for backend API
+    const submitData = {
+      title: values.title,
+      content: values.content,
+      status: values.status,
+      timeStart: values.timeStart ? values.timeStart.format('YYYY-MM-DD') : null,
+      timeFinish: values.timeFinish ? values.timeFinish.format('YYYY-MM-DD') : null,
+    };
 
+    // Add optional fields
+    if (values.priority) {
+      submitData.priority = values.priority;
+    }
+    if (values.tags) {
+      submitData.tags = values.tags;
+    }
+    if (showAssignee && values.assigneeId) {
+      submitData.assigneeId = values.assigneeId;
+    }
+    onFinish(submitData);
+  };
+  const filterUserOption = (input, option) => {
+    const userText = option.children[1].props.children.toLowerCase();
+    return userText.includes(input.toLowerCase());
+  };
   return (
     <Form
       form={form}
@@ -39,18 +108,25 @@ const TaskForm = ({ visible, onCancel, onFinish, initialValues, loading, users =
       <Form.Item
         name="title"
         label="Tiêu đề công việc"
-        rules={[{ required: true, message: 'Vui lòng nhập tiêu đề công việc!' }]}
+        rules={[{ required: true, message: 'Vui lòng nhập tiêu đề công việc!' },
+        { max: 255, message: 'Tiêu đề không được vượt quá 255 ký tự!' }
+        ]}
       >
         <Input placeholder="Nhập tiêu đề công việc" />
       </Form.Item>
 
       <Form.Item
-        name="description"
+        name="content"
         label="Mô tả"
+        rules={[
+          { required: true, message: 'Vui lòng nhập mô tả công việc!' }
+        ]}
       >
         <TextArea 
           rows={4} 
           placeholder="Nhập mô tả chi tiết cho công việc..." 
+          showCount
+          maxLength={1000}
         />
       </Form.Item>
 
@@ -78,6 +154,7 @@ const TaskForm = ({ visible, onCancel, onFinish, initialValues, loading, users =
           <Option value="done">Hoàn thành</Option>
         </Select>
       </Form.Item>
+
     {showAssignee && (
       <Form.Item
         name="assigneeId"
@@ -88,12 +165,19 @@ const TaskForm = ({ visible, onCancel, onFinish, initialValues, loading, users =
           allowClear
           showSearch
           optionFilterProp="children"
+          filterOption={filterUserOption}
+          notFoundContent={users.length === 0 ? "Đang tải..." : "Không tìm thấy người dùng"}
         >
           {users.map(user => (
             <Option key={user.id} value={user.id}>
               <Space>
                 <Avatar size="small" src={user.avatar} icon={<UserOutlined />} />
                 <span>{user.name}</span>
+                {user.email && (
+                    <span style={{ color: '#999', fontSize: '12px' }}>
+                      ({user.email})
+                    </span>
+                  )}
               </Space>
             </Option>
           ))}
@@ -101,13 +185,24 @@ const TaskForm = ({ visible, onCancel, onFinish, initialValues, loading, users =
       </Form.Item>
       )}
       <Form.Item
-        name="dueDate"
-        label="Hạn hoàn thành"
+        name="timeStart"
+        label="Thời gian bắt đầu"
       >
         <DatePicker 
           style={{ width: '100%' }}
           format="DD/MM/YYYY"
-          placeholder="Chọn ngày hết hạn"
+          placeholder="Chọn ngày bắt đầu"
+        />
+      </Form.Item>
+
+      <Form.Item
+        name="timeFinish"
+        label="Thời gian kết thúc"
+      >
+        <DatePicker 
+          style={{ width: '100%' }}
+          format="DD/MM/YYYY"
+          placeholder="Chọn ngày kết thúc"
         />
       </Form.Item>
 
@@ -119,7 +214,7 @@ const TaskForm = ({ visible, onCancel, onFinish, initialValues, loading, users =
           mode="tags"
           placeholder="Thêm thẻ"
           style={{ width: '100%' }}
-          tokenSeparators={[',']}
+          tokenSeparators={[',','']}
         />
       </Form.Item>
 

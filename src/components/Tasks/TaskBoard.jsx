@@ -1,5 +1,5 @@
 import React from 'react';
-import { Row, Col, Card, Empty } from 'antd';
+import { Row, Col, Card, Empty,Tag } from 'antd';
 import {
   DndContext,
   closestCorners,
@@ -24,8 +24,16 @@ const dropAnimation = {
   ...defaultDropAnimation,
   dragSourceOpacity: 0.5,
 };
-
-const SortableTask = ({ task, onEdit, onDelete }) => {
+const getStatusColor = (status) => {
+    const colors = {
+      'todo': '#d9d9d9',
+      'in-progress': '#1890ff',
+      'done': '#52c41a',
+      'backlog': '#ff4d4f'
+    };
+    return colors[status] || '#d9d9d9';
+  };
+const SortableTask = ({ task, onEdit, onDelete, onViewDetail }) => {
   const {
     attributes,
     listeners,
@@ -46,6 +54,7 @@ const SortableTask = ({ task, onEdit, onDelete }) => {
     transition,
     opacity: isDragging ? 0.5 : 1,
     cursor: isDragging ? 'grabbing' : 'grab',
+    marginBottom: '12px'
   };
 
   return (
@@ -59,6 +68,8 @@ const SortableTask = ({ task, onEdit, onDelete }) => {
         task={task}
         onEdit={onEdit}
         onDelete={onDelete}
+        onViewDetail={onViewDetail}
+        compact={true}
       />
     </div>
   );
@@ -70,7 +81,8 @@ const TaskColumn = ({
   color, 
   tasks, 
   onEditTask, 
-  onDeleteTask 
+  onDeleteTask,
+  onViewDetail  
 }) => {
   const {
     attributes,
@@ -92,7 +104,10 @@ const TaskColumn = ({
     transition,
     border: isOver ? `2px dashed ${color}` : `2px solid ${color}20`,
     backgroundColor: isOver ? `${color}10` : '#fafafa',
+    borderRadius: '8px',
+    height: '100%'
   };
+
 
   return (
     <Col xs={24} sm={12} lg={6}>
@@ -101,7 +116,7 @@ const TaskColumn = ({
           size="small"
           title={
             <div 
-              style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}
+              style={{ display: 'flex', alignItems: 'center', cursor: 'grab', padding: '8px 0' }}
               {...attributes}
               {...listeners}
             >
@@ -110,52 +125,63 @@ const TaskColumn = ({
                   width: 12,
                   height: 12,
                   borderRadius: '50%',
-                  backgroundColor: color,
-                  marginRight: 8
+                  backgroundColor: getStatusColor(id),
+                  marginRight: 8,
+                  flexShrink: 0
                 }}
               />
-              <span>{title}</span>
-              <span style={{ 
-                marginLeft: 8, 
-                backgroundColor: '#f0f0f0',
-                borderRadius: '10px',
-                padding: '2px 8px',
-                fontSize: '12px'
-              }}>
+              <span style={{ flex: 1, fontWeight: 600 }}>{title}</span>
+              <Tag 
+                color={getStatusColor(id)}
+                style={{ 
+                  margin: 0, 
+                  borderRadius: '10px',
+                  minWidth: '24px',
+                  textAlign: 'center'
+                }}
+              >
                 {tasks.length}
-              </span>
+              </Tag>
             </div>
           }
           style={{ 
             height: '100%',
             border: 'none',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
           }}
           bodyStyle={{ 
-            padding: '12px',
-            minHeight: '400px',
-            borderRadius: '0 0 8px 8px'
+            padding: '16px 12px',
+            minHeight: '500px',
+            maxHeight: '70vh',
+            overflowY: 'auto'
+          }}
+          headStyle={{
+            borderBottom: `2px solid ${getStatusColor(id)}`,
+            background: 'white'
           }}
         >
           <SortableContext 
             items={tasks.map(t => t.id)} 
             strategy={verticalListSortingStrategy}
           >
-            <div style={{ minHeight: '200px' }}>
+            <div style={{ minHeight: '100px' }}>
               {tasks.length === 0 ? (
                 <div 
                   style={{ 
-                    height: '100px', 
+                    height: '120px', 
                     display: 'flex', 
                     alignItems: 'center', 
                     justifyContent: 'center',
                     border: isOver ? '2px dashed #d9d9d9' : 'none',
                     borderRadius: '6px',
-                    backgroundColor: isOver ? '#f0f8ff' : 'transparent'
+                    backgroundColor: isOver ? '#f0f8ff' : 'transparent',
+                    transition: 'all 0.3s'
                   }}
                 >
                   <Empty 
                     image={Empty.PRESENTED_IMAGE_SIMPLE} 
                     description="Thả công việc vào đây"
+                    imageStyle={{ height: 40 }}
                   />
                 </div>
               ) : (
@@ -165,6 +191,7 @@ const TaskColumn = ({
                     task={task}
                     onEdit={onEditTask}
                     onDelete={onDeleteTask}
+                    onViewDetail={onViewDetail}
                   />
                 ))
               )}
@@ -176,7 +203,8 @@ const TaskColumn = ({
   );
 };
 
-const TaskBoard = ({ tasks, onEditTask, onDeleteTask, onTaskMove }) => {
+const TaskBoard = ({ tasks, onEditTask, onDeleteTask, onTaskMove, onViewDetail }) => 
+{
   const [activeTask, setActiveTask] = React.useState(null);
   const [activeColumn, setActiveColumn] = React.useState(null);
 
@@ -184,25 +212,21 @@ const TaskBoard = ({ tasks, onEditTask, onDeleteTask, onTaskMove }) => {
     {
       id: 'backlog',
       title: 'Tồn Đọng',
-      color: '#faad14',
       tasks: tasks.filter(task => task.status === 'backlog')
     },
     {
       id: 'todo',
       title: 'Chưa Bắt Đầu',
-      color: '#d9d9d9',
       tasks: tasks.filter(task => task.status === 'todo')
     },
     {
       id: 'in-progress',
       title: 'Đang Thực Hiện',
-      color: '#1890ff',
       tasks: tasks.filter(task => task.status === 'in-progress')
     },
     {
       id: 'done',
       title: 'Hoàn Thành',
-      color: '#52c41a',
       tasks: tasks.filter(task => task.status === 'done')
     }
   ];
@@ -210,7 +234,7 @@ const TaskBoard = ({ tasks, onEditTask, onDeleteTask, onTaskMove }) => {
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 5,
+        distance: 3,
       },
     }),
     useSensor(KeyboardSensor)
@@ -295,7 +319,8 @@ const TaskBoard = ({ tasks, onEditTask, onDeleteTask, onTaskMove }) => {
   const allTaskIds = columns.flatMap(col => col.tasks.map(task => task.id));
 
   return (
-    <>
+    <div style={{ padding: '8px 0' }}>
+    
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
@@ -311,10 +336,11 @@ const TaskBoard = ({ tasks, onEditTask, onDeleteTask, onTaskMove }) => {
                 key={column.id}
                 id={column.id}
                 title={column.title}
-                color={column.color}
+                color={getStatusColor(column.id)}
                 tasks={column.tasks}
                 onEditTask={onEditTask}
                 onDeleteTask={onDeleteTask}
+                onViewDetail={onViewDetail}
               />
             ))}
           </Row>
@@ -326,17 +352,30 @@ const TaskBoard = ({ tasks, onEditTask, onDeleteTask, onTaskMove }) => {
               transform: 'rotate(5deg)',
               opacity: 0.8,
               cursor: 'grabbing',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.15)'
             }}>
               <TaskCard
                 task={activeTask}
                 onEdit={onEditTask}
                 onDelete={onDeleteTask}
+                onViewDetail={onViewDetail}
+                compact={true}
               />
             </div>
           ) : null}
         </DragOverlay>
       </DndContext>
-    </>
+    {/* Helper function for status colors */}
+      {function getStatusColor(status) {
+        const colors = {
+          'todo': '#d9d9d9',
+          'in-progress': '#1890ff',
+          'done': '#52c41a',
+          'backlog': '#ff4d4f'
+        };
+        return colors[status] || '#d9d9d9';
+      }}
+    </div>
   );
 };
 
