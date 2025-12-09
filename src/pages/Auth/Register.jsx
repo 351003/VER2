@@ -1,20 +1,33 @@
 import React from 'react';
-import { Form, Input, Button, Card, message } from 'antd';
+import { Form, Input, Button, Card, message, App, Divider } from 'antd';
 import { UserOutlined, LockOutlined, MailOutlined } from '@ant-design/icons';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 
-const Register = () => {
+const RegisterContent = () => {
   const navigate = useNavigate();
+  const { message: msg } = App.useApp();
+  const { register } = useAuth();
   const [loading, setLoading] = React.useState(false);
+  const [form] = Form.useForm();
 
   const onFinish = async (values) => {
+    if (values.password !== values.confirmPassword) {
+      msg.error('Mật khẩu không trùng khớp!');
+      return;
+    }
+
     setLoading(true);
-    // Mock registration
-    setTimeout(() => {
-      message.success('Đăng ký thành công! Vui lòng đăng nhập.');
+    const result = await register(values.fullName, values.email, values.password);
+    
+    if (result.success) {
+      msg.success('Tạo tài khoản thành công! Vui lòng đăng nhập.');
+      form.resetFields();
       navigate('/login');
-      setLoading(false);
-    }, 1500);
+    } else {
+      msg.error(result.message || 'Đăng ký thất bại!');
+    }
+    setLoading(false);
   };
 
   return (
@@ -23,32 +36,37 @@ const Register = () => {
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      background: 'linear-gradient(135deg, #e34a70ff 0%, #b8085df6 100%)'
+      background: 'linear-gradient(135deg, #e34a70ff 0%, #b8085df6 100%)',
+      padding: '20px'
     }}>
       <Card
         title="Đăng Ký Tài Khoản"
         style={{
-          width: 400,
+          width: '100%',
+          maxWidth: 450,
           boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
         }}
       >
         <Form
-          name="register"
+          form={form}
           onFinish={onFinish}
           autoComplete="off"
           size="large"
+          layout="vertical"
         >
           <Form.Item
-            name="name"
+            label="Họ Tên"
+            name="fullName"
             rules={[{ required: true, message: 'Vui lòng nhập họ tên!' }]}
           >
             <Input 
               prefix={<UserOutlined />} 
-              placeholder="Họ và tên" 
+              placeholder="Nhập họ tên của bạn" 
             />
           </Form.Item>
 
           <Form.Item
+            label="Email"
             name="email"
             rules={[
               { required: true, message: 'Vui lòng nhập email!' },
@@ -57,37 +75,28 @@ const Register = () => {
           >
             <Input 
               prefix={<MailOutlined />} 
-              placeholder="Email" 
+              placeholder="Nhập email" 
             />
           </Form.Item>
 
           <Form.Item
+            label="Mật Khẩu"
             name="password"
             rules={[{ required: true, message: 'Vui lòng nhập mật khẩu!' }]}
           >
-            <Input.Password
-              prefix={<LockOutlined />}
-              placeholder="Mật khẩu"
+            <Input.Password 
+              prefix={<LockOutlined />} 
+              placeholder="Nhập mật khẩu"
             />
           </Form.Item>
 
           <Form.Item
+            label="Xác Nhận Mật Khẩu"
             name="confirmPassword"
-            dependencies={['password']}
-            rules={[
-              { required: true, message: 'Vui lòng xác nhận mật khẩu!' },
-              ({ getFieldValue }) => ({
-                validator(_, value) {
-                  if (!value || getFieldValue('password') === value) {
-                    return Promise.resolve();
-                  }
-                  return Promise.reject(new Error('Mật khẩu xác nhận không khớp!'));
-                },
-              }),
-            ]}
+            rules={[{ required: true, message: 'Vui lòng xác nhận mật khẩu!' }]}
           >
-            <Input.Password
-              prefix={<LockOutlined />}
+            <Input.Password 
+              prefix={<LockOutlined />} 
               placeholder="Xác nhận mật khẩu"
             />
           </Form.Item>
@@ -104,13 +113,30 @@ const Register = () => {
           </Form.Item>
         </Form>
 
-        <div style={{ textAlign: 'center', marginTop: 16 }}>
-          <span>Đã có tài khoản? </span>
-          <Link to="/login">Đăng nhập ngay</Link>
+        <Divider style={{ margin: '16px 0' }} />
+
+        <div style={{ textAlign: 'center' }}>
+          <span style={{ color: '#666' }}>Đã có tài khoản? </span>
+          <Button 
+            type="link" 
+            onClick={() => navigate('/login')}
+            style={{ padding: 0 }}
+          >
+            Đăng nhập tại đây
+          </Button>
         </div>
       </Card>
     </div>
   );
 };
+
+const Register = () => {
+  return (
+    <App>
+      <RegisterContent />
+    </App>
+  );
+};
+
 
 export default Register;

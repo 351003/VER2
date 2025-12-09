@@ -31,61 +31,74 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
-  const login = async (email, password) => {
+  const login = async (email, password, isManager = false) => {
     try {
-      let userData;
+      const { default: axios } = await import('axios');
       
-      if (email === 'admin@example.com' && password === 'password') {
+      // Chọn endpoint dựa trên loại tài khoản
+      const endpoint = isManager 
+        ? 'http://localhost:3370/api/v3/users/login'  // Manager login
+        : 'http://localhost:3370/api/v1/users/login'; // User login
+      
+      const response = await axios.post(endpoint, { email, password });
+      
+      if (response.data.code !== 200) {
+        return { success: false, message: response.data.message || 'Đăng nhập thất bại!' };
+      }
+      
+      const token = response.data.token;
+      
+      // Lấy thông tin user từ API detail
+      let userData;
+      try {
+        // Gọi API để lấy thông tin chi tiết user
+        const userResponse = await axios.get('http://localhost:3370/api/v1/users/detail', {
+          headers: { Cookie: `token=${token}` }
+        });
+        
+        if (userResponse.data.code === 200 && userResponse.data.info) {
+          userData = {
+            id: userResponse.data.info._id,
+            name: userResponse.data.info.fullName,
+            email: userResponse.data.info.email,
+            role: isManager ? 'manager' : 'user',
+            avatar: userResponse.data.info.avatar || null,
+            permissions: []
+          };
+        } else {
+          // Fallback nếu không lấy được thông tin
+          userData = {
+            id: Date.now().toString(),
+            name: email.split('@')[0],
+            email: email,
+            role: isManager ? 'manager' : 'user',
+            avatar: null,
+            permissions: []
+          };
+        }
+      } catch (error) {
+        // Fallback nếu API detail lỗi
         userData = {
-          id: 1,
-          name: 'Nguyễn Văn Admin',
-          email: 'admin@example.com',
-          role: 'admin',
+          id: Date.now().toString(),
+          name: email.split('@')[0],
+          email: email,
+          role: isManager ? 'manager' : 'user',
           avatar: null,
-          permissions: [
-            'all',
-          
-            'manage_users', 'view_team_reports', 'view_admin'
-          ]//'create_project', 'edit_project', 'delete_project','create_team', 'edit_team', 'delete_team',
+          permissions: []
         };
-      } else if (email === 'user@example.com' && password === 'password') {
-        userData = {
-          id: 2,
-          name: 'Trần Văn User',
-          email: 'user@example.com',
-          role: 'user',
-          avatar: null,
-          permissions: [
-            'view_tasks', 'create_tasks', 'edit_own_tasks', 'delete_own_tasks',
-            'view_projects', 'view_teams', 'view_calendar', 'view_own_reports'
-          ]
-        };
-      } else if (email === 'manager@example.com' && password === 'password') {
-        userData = {
-          id: 3,
-          name: 'Lê Thị Manager',
-          email: 'manager@example.com',
-          role: 'manager',
-          avatar: null,
-          permissions: [
-            'view_tasks', 'create_tasks', 'edit_tasks', 'delete_tasks',
-            'view_projects', 'create_projects', 'edit_projects', 'view_teams',
-            'create_teams', 'edit_teams', 'create_calendar', 'view_calendar', 'view_team_reports',
-            'manage_team_tasks'
-          ]
-        };
-      } else {
-        return { success: false, message: 'Email hoặc mật khẩu không đúng!' };
       }
 
-      const token = 'mock-jwt-token-' + userData.id;
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(userData));
       
       setUser(userData);
-      return { success: true };
+      return { success: true, message: 'Đăng nhập thành công!' };
     } catch (error) {
-      return { success: false, message: 'Đăng nhập thất bại!' };
+      console.error('Login error details:', error);
+      const errorMsg = error.response?.data?.message || 
+                       error.message || 
+                       'Không thể kết nối đến server. Vui lòng kiểm tra backend đang chạy trên http://localhost:3370';
+      return { success: false, message: errorMsg };
     }
   };
 
@@ -95,10 +108,96 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
+  const register = async (fullName, email, password) => {
+    try {
+      const { default: axios } = await import('axios');
+      
+      const response = await axios.post(
+        'http://localhost:3370/api/v1/users/register',
+        { fullName, email, password }
+      );
+      
+      if (response.data.code !== 200) {
+        return { success: false, message: response.data.message || 'Đăng ký thất bại!' };
+      }
+      
+      return { success: true, message: 'Tạo tài khoản thành công!' };
+    } catch (error) {
+      const errorMsg = error.response?.data?.message || error.message || 'Lỗi đăng ký';
+      return { success: false, message: errorMsg };
+    }
+  };
+
+  const forgotPassword = async (email) => {
+    try {
+      const { default: axios } = await import('axios');
+      
+      const response = await axios.post(
+        'http://localhost:3370/api/v1/users/password/forgot',
+        { email }
+      );
+      
+      if (response.data.code !== 200) {
+        return { success: false, message: response.data.message || 'Email không tồn tại!!!' };
+      }
+      
+      return { success: true, message: 'Đã gửi mã OTP qua email!!!' };
+    } catch (error) {
+      const errorMsg = error.response?.data?.message || error.message || 'Lỗi gửi OTP';
+      return { success: false, message: errorMsg };
+    }
+  };
+
+  const verifyOTP = async (email, otp) => {
+    try {
+      const { default: axios } = await import('axios');
+      
+      const response = await axios.post(
+        'http://localhost:3370/api/v1/users/password/otp',
+        { email, otp }
+      );
+      
+      if (response.data.code !== 200) {
+        return { success: false, message: response.data.message || 'OTP không hợp lệ' };
+      }
+      
+      return { success: true, message: 'Xác thực thành công!' };
+    } catch (error) {
+      const errorMsg = error.response?.data?.message || error.message || 'OTP không hợp lệ';
+      return { success: false, message: errorMsg };
+    }
+  };
+
+  const resetPassword = async (email, password, confirmPassword) => {
+    try {
+      const { default: axios } = await import('axios');
+      
+      const response = await axios.post(
+        'http://localhost:3370/api/v1/users/password/reset',
+        { email, password, confirmPassword }
+      );
+      
+      if (response.data.code !== 200) {
+        return { success: false, message: response.data.message || 'Thay đổi mật khẩu thất bại!' };
+      }
+      
+      return { success: true, message: 'Thành công! Vui lòng đăng nhập lại.' };
+    } catch (error) {
+      const errorMsg = error.response?.data?.message || error.message || 'Lỗi thay đổi mật khẩu';
+      return { success: false, message: errorMsg };
+    }
+  };
+
   const hasPermission = (permission) => {
     if (!user) return false;
+    
+    // Manager có tất cả quyền
+    if (user.role === 'manager') return true;
+    
+    // Admin có tất cả quyền (nếu có)
     if (user.role === 'admin') return true;
-    if (user.permissions?.includes('all')) return true;
+    
+    // User thông thường kiểm tra permissions
     return user.permissions?.includes(permission) || false;
   };
 
@@ -107,6 +206,10 @@ export const AuthProvider = ({ children }) => {
     loading,
     login,
     logout,
+    register,
+    forgotPassword,
+    verifyOTP,
+    resetPassword,
     hasPermission
   };
 

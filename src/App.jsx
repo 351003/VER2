@@ -8,6 +8,7 @@ import { NotificationProvider } from './contexts/NotificationContext';
 // Pages
 import Login from './pages/Auth/Login';
 import Register from './pages/Auth/Register';
+import ForgotPassword from './pages/Auth/ForgotPassword';
 import Dashboard from './pages/Dashboard/Dashboard';
 import PersonalTasks from './pages/Tasks/PersonalTasks';
 import TeamTasks from './pages/Tasks/TeamTasks';
@@ -78,6 +79,7 @@ function App() {
               {/* Public */}
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
 
               {/* Protected */}
               <Route

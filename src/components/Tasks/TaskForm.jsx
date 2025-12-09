@@ -6,29 +6,6 @@ import dayjs from 'dayjs';
 const { Option } = Select;
 const { TextArea } = Input;
 
-// const TaskForm = ({ visible, onCancel, onFinish, initialValues, loading, users = [], showAssignee = true }) => {
-//   const [form] = Form.useForm();
-
-//   useEffect(() => {
-//     if (visible) {
-//       if (initialValues) {
-//         form.setFieldsValue({
-//           ...initialValues,
-//           dueDate: initialValues.dueDate ? dayjs(initialValues.dueDate) : null
-//         });
-//       } else {
-//         form.resetFields();
-//       }
-//     }
-//   }, [visible, initialValues, form]);
-
-//   const handleFinish = (values) => {
-//     onFinish({
-//       ...values,
-//       dueDate: values.dueDate ? values.dueDate.format('YYYY-MM-DD') : null
-//     });
-//   };
-
 const TaskForm = ({ 
   visible, 
   onCancel, 

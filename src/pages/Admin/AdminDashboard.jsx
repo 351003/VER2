@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, Statistic, Tabs, Typography, Table, Tag, Progress } from 'antd';
+import { Card, Row, Col, Statistic, Tabs, Typography, Table, Tag, Progress, App } from 'antd';
 import { 
   UserOutlined, 
   ProjectOutlined, 
@@ -15,7 +15,7 @@ import SystemSettings from '../../components/Admin/SystemSettings';
 const { Title } = Typography;
 const { TabPane } = Tabs;
 
-const AdminDashboard = () => {
+const AdminDashboardContent = () => {
   const [dashboardStats, setDashboardStats] = useState({});
   const [recentRegistrations, setRecentRegistrations] = useState([]);
 
@@ -215,6 +215,14 @@ const AdminDashboard = () => {
         </TabPane>
       </Tabs>
     </div>
+  );
+};
+
+const AdminDashboard = () => {
+  return (
+    <App>
+      <AdminDashboardContent />
+    </App>
   );
 };
 

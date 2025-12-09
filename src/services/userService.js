@@ -41,7 +41,7 @@ const userService = {
   // Lấy danh sách users (cho assignee)
   async getUsers(params = {}) {
     try {
-      const response = await apiClient.get('/users', { 
+      const response = await apiClient.get('/users/listuser', { 
         params: {
           page: params.page || 1,
           limit: params.limit || 100,

@@ -33,7 +33,7 @@ const getStatusColor = (status) => {
     };
     return colors[status] || '#d9d9d9';
   };
-const SortableTask = ({ task, onEdit, onDelete, onViewDetail }) => {
+const SortableTask = React.memo(({ task, onEdit, onDelete, onViewDetail }) => {
   const {
     attributes,
     listeners,
@@ -42,7 +42,7 @@ const SortableTask = ({ task, onEdit, onDelete, onViewDetail }) => {
     transition,
     isDragging,
   } = useSortable({ 
-    id: task.id,
+    id: task._id,
     data: {
       type: 'task',
       task,
@@ -73,9 +73,9 @@ const SortableTask = ({ task, onEdit, onDelete, onViewDetail }) => {
       />
     </div>
   );
-};
+});
 
-const TaskColumn = ({ 
+const TaskColumn = React.memo(({ 
   id, 
   title, 
   color, 
@@ -161,7 +161,7 @@ const TaskColumn = ({
           }}
         >
           <SortableContext 
-            items={tasks.map(t => t.id)} 
+            items={tasks.map(t => t._id)} 
             strategy={verticalListSortingStrategy}
           >
             <div style={{ minHeight: '100px' }}>
@@ -187,7 +187,7 @@ const TaskColumn = ({
               ) : (
                 tasks.map((task) => (
                   <SortableTask
-                    key={task.id}
+                    key={task._id}
                     task={task}
                     onEdit={onEditTask}
                     onDelete={onDeleteTask}
@@ -201,14 +201,14 @@ const TaskColumn = ({
       </div>
     </Col>
   );
-};
+}, (prev, next) => prev.tasks === next.tasks && prev.id === next.id && prev.title === next.title);
 
 const TaskBoard = ({ tasks, onEditTask, onDeleteTask, onTaskMove, onViewDetail }) => 
 {
   const [activeTask, setActiveTask] = React.useState(null);
   const [activeColumn, setActiveColumn] = React.useState(null);
 
-  const columns = [
+  const columns = React.useMemo(() => [
     {
       id: 'backlog',
       title: 'Tồn Đọng',
@@ -229,27 +229,27 @@ const TaskBoard = ({ tasks, onEditTask, onDeleteTask, onTaskMove, onViewDetail }
       title: 'Hoàn Thành',
       tasks: tasks.filter(task => task.status === 'done')
     }
-  ];
+  ], [tasks]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 3,
+        distance: 10,
       },
     }),
     useSensor(KeyboardSensor)
   );
 
-  const handleDragStart = (event) => {
+  const handleDragStart = React.useCallback((event) => {
     const { active } = event;
-    const task = tasks.find(t => t.id === active.id);
+    const task = tasks.find(t => t._id === active.id);
     
     if (task) {
       setActiveTask(task);
     }
-  };
+  }, [tasks]);
 
-  const handleDragOver = (event) => {
+  const handleDragOver = React.useCallback((event) => {
     const { active, over } = event;
     
     if (!over) return;
@@ -264,9 +264,9 @@ const TaskBoard = ({ tasks, onEditTask, onDeleteTask, onTaskMove, onViewDetail }
     if (overColumn) {
       setActiveColumn(overColumn.id);
     }
-  };
+  }, [columns]);
 
-  const handleDragEnd = (event) => {
+  const handleDragEnd = React.useCallback((event) => {
     const { active, over } = event;
     
     setActiveTask(null);
@@ -280,13 +280,13 @@ const TaskBoard = ({ tasks, onEditTask, onDeleteTask, onTaskMove, onViewDetail }
     if (activeId === overId) return;
 
     // Find the active task
-    const activeTask = tasks.find(task => task.id === activeId);
+    const activeTask = tasks.find(task => task._id === activeId);
     if (!activeTask) return;
 
     let targetStatus = null;
 
     // Case 1: Dropping over another task
-    const overTask = tasks.find(task => task.id === overId);
+    const overTask = tasks.find(task => task._id === overId);
     if (overTask) {
       targetStatus = overTask.status;
     }
@@ -308,15 +308,15 @@ const TaskBoard = ({ tasks, onEditTask, onDeleteTask, onTaskMove, onViewDetail }
     if (activeTask.status !== targetStatus) {
       onTaskMove(activeId, targetStatus);
     }
-  };
+  }, [tasks, columns, activeColumn, onTaskMove]);
 
-  const handleDragCancel = () => {
+  const handleDragCancel = React.useCallback(() => {
     setActiveTask(null);
     setActiveColumn(null);
-  };
+  }, []);
 
   // Get all task IDs for SortableContext
-  const allTaskIds = columns.flatMap(col => col.tasks.map(task => task.id));
+  const allTaskIds = React.useMemo(() => columns.flatMap(col => col.tasks.map(task => task._id)), [columns]);
 
   return (
     <div style={{ padding: '8px 0' }}>
@@ -365,16 +365,6 @@ const TaskBoard = ({ tasks, onEditTask, onDeleteTask, onTaskMove, onViewDetail }
           ) : null}
         </DragOverlay>
       </DndContext>
-    {/* Helper function for status colors */}
-      {function getStatusColor(status) {
-        const colors = {
-          'todo': '#d9d9d9',
-          'in-progress': '#1890ff',
-          'done': '#52c41a',
-          'backlog': '#ff4d4f'
-        };
-        return colors[status] || '#d9d9d9';
-      }}
     </div>
   );
 };

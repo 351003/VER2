@@ -69,7 +69,7 @@ const TaskCard = ({
       key: 'view',
       icon: <EyeOutlined />,
       label: 'Xem chi tiết',
-      onClick: () => onViewDetail && onViewDetail(task.id)
+      onClick: () => onViewDetail && onViewDetail(task._id)
     },
     {
       key: 'edit',
@@ -85,7 +85,7 @@ const TaskCard = ({
       icon: <DeleteOutlined />,
       label: 'Xóa',
       danger: true,
-      onClick: () => onDelete && onDelete(task.id)
+      onClick: () => onDelete && onDelete(task._id)
     }
   ];
 
@@ -104,7 +104,7 @@ const TaskCard = ({
         padding: compact ? '12px' : '16px'
       }}
       hoverable
-      onClick={() => onViewDetail && onViewDetail(task.id)}
+      onClick={() => onViewDetail && onViewDetail(task._id)}
     >
       {/* Header với tiêu đề và menu */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
@@ -257,7 +257,7 @@ const TaskCard = ({
             icon={<EyeOutlined />}
             onClick={(e) => {
               e.stopPropagation();
-              onViewDetail && onViewDetail(task.id);
+              onViewDetail && onViewDetail(task._id);
             }}
           >
             Chi tiết
@@ -279,8 +279,14 @@ const TaskCard = ({
               icon={<DeleteOutlined />}
               danger
               onClick={(e) => {
+                console.log("DELETE BUTTON CLICKED!");
+                console.log("task._id:", task._id);
+                console.log("onDelete function exists:", !!onDelete);
                 e.stopPropagation();
-                onDelete && onDelete(task.id);
+                if (onDelete) {
+                  console.log("Calling onDelete with:", task._id);
+                  onDelete(task._id);
+                }
               }}
             >
               Xóa
@@ -292,4 +298,5 @@ const TaskCard = ({
   );
 };
 
-export default TaskCard;
+// export default TaskCard;
+export default React.memo(TaskCard);
