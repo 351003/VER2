@@ -75,6 +75,17 @@ const TaskForm = ({
     const userText = option.children[1].props.children.toLowerCase();
     return userText.includes(input.toLowerCase());
   };
+  // Validation cho timeFinish không được trước timeStart
+  const validateDates = (_, value) => {
+    const timeStart = form.getFieldValue('timeStart');
+    
+    if (timeStart && value) {
+      if (value.isBefore(timeStart, 'day')) {
+        return Promise.reject(new Error('Hạn hoàn thành không được trước ngày bắt đầu!'));
+      }
+    }
+    return Promise.resolve();
+  };
   return (
     <Form
       form={form}
@@ -164,6 +175,7 @@ const TaskForm = ({
       <Form.Item
         name="timeStart"
         label="Thời gian bắt đầu"
+        rules={[{ required: true, message: 'Vui lòng chọn ngày bắt đầu!' }]}
       >
         <DatePicker 
           style={{ width: '100%' }}
@@ -175,6 +187,7 @@ const TaskForm = ({
       <Form.Item
         name="timeFinish"
         label="Thời gian kết thúc"
+        rules={[{ validator: validateDates }]}
       >
         <DatePicker 
           style={{ width: '100%' }}

@@ -13,7 +13,6 @@ import {
   Empty,
   Typography,
   Statistic,
-  Checkbox,
   Table,
   Tag,
   App
@@ -24,7 +23,7 @@ import {
   AppstoreOutlined,
   UnorderedListOutlined,
   ProjectOutlined,
-  TeamOutlined,
+  UserOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
   EyeOutlined,
@@ -35,8 +34,7 @@ import { useNavigate } from 'react-router-dom';
 import ProjectCard from '../../components/Projects/ProjectCard';
 import ProjectForm from '../../components/Projects/ProjectForm';
 import { useAuth } from '../../contexts/AuthContext';
-import PermissionWrapper from '../../components/Common/PermissionWrapper';
-import projectService from '../../services/projectService'; // Import service mới
+import projectService from '../../services/projectService';
 import debounce from 'lodash/debounce';
 
 const { Title } = Typography;
@@ -63,16 +61,19 @@ const ProjectsContent = () => {
   
   const [sortField, setSortField] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState('desc');
-  const { hasPermission, user: currentUser } = useAuth();
+  const {hasPermission, user: currentUser } = useAuth();
 
   const [users, setUsers] = useState([]);
-  const [allProjects, setAllProjects] = useState([]);
-
+  const [isManager, setIsManager] = useState(false);
+  
   useEffect(() => {
-    loadUsers();
-    loadAllProjects();
-    loadProjects();
-  }, [pagination.current, pagination.pageSize, sortField, sortOrder]);
+    if (currentUser) {
+      const managerRoles = ['manager', 'MANAGER'];
+      setIsManager(managerRoles.includes(currentUser.role));
+      loadUsers();
+      loadProjects();
+    }
+  }, [currentUser, pagination.current, pagination.pageSize, sortField, sortOrder]);
 
   useEffect(() => {
     filterProjects();
@@ -88,19 +89,11 @@ const ProjectsContent = () => {
       const mockUsers = [
         { _id: '1', fullName: 'Nguyễn Văn A', email: 'a@example.com', avatar: null },
         { _id: '2', fullName: 'Trần Thị B', email: 'b@example.com', avatar: null },
-      ];
+        { _id: currentUser?.id, fullName: currentUser?.fullName, email: currentUser?.email, avatar: currentUser?.avatar }
+      ].filter(Boolean);
       setUsers(mockUsers);
     } catch (error) {
       console.error('Error loading users:', error);
-    }
-  };
-
-  const loadAllProjects = async () => {
-    try {
-      const response = await projectService.getProjects({ pageSize: 1000 });
-      setAllProjects(response.data || []);
-    } catch (error) {
-      console.error('Error loading all projects:', error);
     }
   };
 
@@ -118,13 +111,12 @@ const ProjectsContent = () => {
       };
 
       const response = await projectService.getProjects(params);
-      const { data, pagination: paginationData } = response;
       
-      setProjects(data || []);
-      setFilteredProjects(data || []);
+      setProjects(response.data || []);
+      setFilteredProjects(response.data || []);
       setPagination({
         ...pagination,
-        total: paginationData?.total || data?.length || 0,
+        total: response.pagination?.total || response.data?.length || 0,
       });
     } catch (error) {
       console.error('Error loading projects:', error);
@@ -171,44 +163,34 @@ const ProjectsContent = () => {
     setFilteredProjects(filtered);
   };
 
-  const handleCreateProject = async (formData) => {
+  const handleFormFinish = async (formData) => {
     try {
       setLoading(true);
-      const response = await projectService.createProject(formData);
-      
-      if (response.success) {
-        message.success(response.message || 'Tạo dự án thành công!');
-        setModalVisible(false);
-        loadProjects();
-        loadAllProjects();
-      } else {
-        message.error(response.message || 'Tạo dự án thất bại!');
+      // Nếu đang tạo dự án mới, set người tạo là người phụ trách
+      if (!editingProject) {
+        formData.assignee_id = currentUser.id;
+        formData.createdBy = currentUser.id;
       }
-    } catch (error) {
-      console.error('Error creating project:', error);
-      message.error(error.message || 'Tạo dự án thất bại!');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleUpdateProject = async (formData) => {
-    try {
-      setLoading(true);
-      const response = await projectService.updateProject(editingProject._id, formData);
+      
+      // Gọi API tạo/cập nhật dự án
+      let response;
+      if (editingProject) {
+        response = await projectService.updateProject(editingProject._id, formData);
+      } else {
+        response = await projectService.createProject(formData);
+      }
       
       if (response.success) {
-        message.success(response.message || 'Cập nhật dự án thành công!');
+        message.success(response.message || 'Thao tác thành công!');
         setModalVisible(false);
         setEditingProject(null);
         loadProjects();
-        loadAllProjects();
       } else {
-        message.error(response.message || 'Cập nhật dự án thất bại!');
+        message.error(response.message || 'Thao tác thất bại!');
       }
     } catch (error) {
-      console.error('Error updating project:', error);
-      message.error(error.message || 'Cập nhật dự án thất bại!');
+      console.error('Error:', error);
+      message.error(error.message || 'Thao tác thất bại!');
     } finally {
       setLoading(false);
     }
@@ -228,7 +210,6 @@ const ProjectsContent = () => {
           if (response.success) {
             message.success(response.message || 'Xóa dự án thành công!');
             loadProjects();
-            loadAllProjects();
           } else {
             message.error(response.message || 'Xóa dự án thất bại!');
           }
@@ -238,38 +219,6 @@ const ProjectsContent = () => {
         }
       }
     });
-  };
-
-  const handleChangeStatus = async (projectId, newStatus) => {
-    try {
-      const response = await projectService.changeProjectStatus(projectId, newStatus);
-      
-      if (response.success) {
-        message.success('Cập nhật trạng thái thành công!');
-        loadProjects();
-      } else {
-        message.error(response.message || 'Cập nhật trạng thái thất bại!');
-      }
-    } catch (error) {
-      console.error('Error changing status:', error);
-      message.error(error.message || 'Cập nhật trạng thái thất bại!');
-    }
-  };
-
-  const handleChangePriority = async (projectId, newPriority) => {
-    try {
-      const response = await projectService.changeProjectPriority(projectId, newPriority);
-      
-      if (response.success) {
-        message.success('Cập nhật độ ưu tiên thành công!');
-        loadProjects();
-      } else {
-        message.error(response.message || 'Cập nhật độ ưu tiên thất bại!');
-      }
-    } catch (error) {
-      console.error('Error changing priority:', error);
-      message.error(error.message || 'Cập nhật độ ưu tiên thất bại!');
-    }
   };
 
   const handleChangeMultiple = async (key, value) => {
@@ -305,70 +254,6 @@ const ProjectsContent = () => {
     setModalVisible(true);
   };
 
-  // Trong Projects.jsx
-const handleFormFinish = async (formData) => {
-  try {
-    setLoading(true);
-    
-    // Kiểm tra nếu đang tạo dự án cha mới
-    const isCreatingParent = formData.get('isCreatingParent') === 'true';
-    const parentProjectData = formData.get('parentProjectData');
-    
-    if (isCreatingParent && parentProjectData) {
-      try {
-        // Tạo dự án cha trước
-        const parentData = JSON.parse(parentProjectData);
-        const parentFormData = new FormData();
-        
-        // Thêm thông tin dự án cha
-        parentFormData.append('title', parentData.title);
-        parentFormData.append('content', parentData.description || '');
-        parentFormData.append('status', parentData.status);
-        parentFormData.append('priority', parentData.priority);
-        parentFormData.append('isParentProject', 'true'); // Đánh dấu là dự án cha
-        parentFormData.append('createdBy', currentUser.id);
-        
-        // Tạo dự án cha
-        const parentResponse = await projectService.createProject(parentFormData);
-        
-        if (parentResponse.success) {
-          // Thêm ID của dự án cha vào formData của dự án con
-          formData.append('projectParentId', parentResponse.data._id);
-          message.success('Đã tạo dự án cha thành công!');
-        } else {
-          throw new Error(parentResponse.message || 'Tạo dự án cha thất bại');
-        }
-      } catch (error) {
-        console.error('Error creating parent project:', error);
-        message.error('Tạo dự án cha thất bại: ' + error.message);
-        return;
-      }
-    }
-    
-    // Gọi API tạo/cập nhật dự án
-    let response;
-    if (editingProject) {
-      response = await projectService.updateProject(editingProject._id, formData);
-    } else {
-      response = await projectService.createProject(formData);
-    }
-    
-    if (response.success) {
-      message.success(response.message || 'Thao tác thành công!');
-      setModalVisible(false);
-      setEditingProject(null);
-      loadProjects();
-    } else {
-      message.error(response.message || 'Thao tác thất bại!');
-    }
-  } catch (error) {
-    console.error('Error:', error);
-    message.error(error.message || 'Thao tác thất bại!');
-  } finally {
-    setLoading(false);
-  }
-};
-
   const handleModalCancel = () => {
     setModalVisible(false);
     setEditingProject(null);
@@ -390,6 +275,26 @@ const handleFormFinish = async (formData) => {
   const rowSelection = {
     selectedRowKeys,
     onChange: setSelectedRowKeys,
+  };
+
+  // Kiểm tra quyền sửa/xóa dự án
+  const canEditProject = (project) => {
+    if (!currentUser || !project) return false;
+    
+    // 1. Người tạo dự án có quyền (và cũng là người phụ trách)
+    if (project.createdBy === currentUser.id) return true;
+    
+    // 3. Manager có quyền sửa tất cả
+    if (isManager) return true;
+    
+    return false;
+  };
+
+  const canDeleteProject = (project) => {
+    if (!currentUser || !project) return false;
+    
+    // Chỉ người tạo dự án hoặc Manager mới được xóa
+    return project.createdBy === currentUser.id || isManager;
   };
 
   const columns = [
@@ -442,6 +347,24 @@ const handleFormFinish = async (formData) => {
       render: (date) => date ? new Date(date).toLocaleDateString('vi-VN') : '-',
     },
     {
+      title: 'Vai trò',
+      key: 'role',
+      render: (_, record) => {
+        let roleText = '';
+        let roleColor = 'default';
+        
+        if (record.createdBy === currentUser?.id) {
+          roleText = 'Phụ trách';
+          roleColor = 'gold';
+        } else if (record.listUser?.includes(currentUser?.id)) {
+          roleText = 'Thành viên';
+          roleColor = 'green';
+        }
+        
+        return roleText ? <Tag color={roleColor}>{roleText}</Tag> : '-';
+      },
+    },
+    {
       title: 'Thao tác',
       key: 'actions',
       render: (_, record) => (
@@ -451,14 +374,14 @@ const handleFormFinish = async (formData) => {
             icon={<EyeOutlined />}
             onClick={() => handleViewProject(record)}
           />
-          {hasPermission('edit_projects') && (
+          {canEditProject(record) && (
             <Button
               size="small"
               icon={<EditOutlined />}
               onClick={() => handleEditProject(record)}
             />
           )}
-          {hasPermission('delete_project') && (
+          {canDeleteProject(record) && (
             <Button
               size="small"
               icon={<DeleteOutlined />}
@@ -476,6 +399,8 @@ const handleFormFinish = async (formData) => {
     completed: projects.filter(p => p.status === 'completed').length,
     inProgress: projects.filter(p => p.status === 'in-progress').length,
     notStarted: projects.filter(p => p.status === 'not-started').length,
+    // Manager phụ trách các dự án mình tạo
+    assignedToMe: projects.filter(p => p.createdBy === currentUser?.id).length,
   };
 
   return (
@@ -486,14 +411,17 @@ const handleFormFinish = async (formData) => {
           <div>
             <Title level={2} style={{ margin: 0 }}>
               <ProjectOutlined style={{ marginRight: 12, color: '#1890ff' }} />
-              Quản Lý Dự Án
+              {isManager ? 'Quản Lý Dự Án' : 'Dự Án Của Tôi'}
             </Title>
             <p style={{ margin: 0, color: '#666' }}>
-              Quản lý và theo dõi tiến độ tất cả dự án
+              {isManager 
+                ? 'Quản lý và theo dõi tiến độ tất cả dự án' 
+                : 'Các dự án bạn đang tham gia và phụ trách'}
             </p>
           </div>
 
-          <PermissionWrapper permission="create_projects">
+          {/* Chỉ Manager mới có quyền tạo dự án mới */}
+          {isManager && (
             <Button
               type="primary"
               icon={<PlusOutlined />}
@@ -501,7 +429,7 @@ const handleFormFinish = async (formData) => {
             >
               Tạo Dự Án
             </Button>
-          </PermissionWrapper>
+          )}
         </div>
       </Card>
 
@@ -539,10 +467,10 @@ const handleFormFinish = async (formData) => {
         <Col xs={12} sm={6}>
           <Card>
             <Statistic
-              title="Chưa bắt đầu"
-              value={stats.notStarted}
-              valueStyle={{ color: '#faad14' }}
-              prefix={<ProjectOutlined />}
+              title={isManager ? "Bạn phụ trách" : "Bạn phụ trách"}
+              value={stats.assignedToMe}
+              valueStyle={{ color: '#722ed1' }}
+              prefix={<UserOutlined />}
             />
           </Card>
         </Col>
@@ -636,8 +564,8 @@ const handleFormFinish = async (formData) => {
           </Col>
         </Row>
 
-        {/* Bulk Actions */}
-        {selectedRowKeys.length > 0 && (
+        {/* Bulk Actions - Chỉ Manager mới có quyền */}
+        {isManager && selectedRowKeys.length > 0 && (
           <Row style={{ marginTop: 16 }}>
             <Col span={24}>
               <Space>
@@ -703,15 +631,14 @@ const handleFormFinish = async (formData) => {
                     thumbnail: project.thumbnail,
                     startDate: project.timeStart,
                     dueDate: project.timeFinish,
-                    teamMembers: project.listUser || [],
-                    totalTasks: project.totalTasks || 0,
-                    completedTasks: project.completedTasks || 0,
+                    assignee_id: project.createdBy, // assignee_id = createdBy
+                    createdBy: project.createdBy,
+                    listUser: project.listUser || [],
                   }}
+                  currentUser={currentUser}
                   onView={handleViewProject}
-                  onEdit={hasPermission('edit_projects') ? handleEditProject : undefined}
-                  onDelete={hasPermission('delete_project') ? handleDeleteProject : undefined}
-                  onChangeStatus={handleChangeStatus}
-                  onChangePriority={handleChangePriority}
+                  onEdit={canEditProject(project) ? handleEditProject : undefined}
+                  onDelete={canDeleteProject(project) ? handleDeleteProject : undefined}
                 />
               </Col>
             ))}
@@ -720,7 +647,7 @@ const handleFormFinish = async (formData) => {
       ) : (
         <Card>
           <Table
-            rowSelection={rowSelection}
+            rowSelection={isManager ? rowSelection : undefined} // Chỉ Manager mới được chọn nhiều
             columns={columns}
             dataSource={filteredProjects}
             rowKey="_id"
@@ -731,26 +658,29 @@ const handleFormFinish = async (formData) => {
         </Card>
       )}
 
-      {/* Project Form Modal */}
-      <Modal
-        title={editingProject ? 'Chỉnh sửa dự án' : 'Tạo dự án mới'}
-        open={modalVisible}
-        onCancel={handleModalCancel}
-        footer={null}
-        width={700}
-        destroyOnClose
-      >
-        <ProjectForm
-          visible={modalVisible}
+      {/* Project Form Modal - Chỉ Manager mới tạo dự án mới */}
+      {isManager && (
+        <Modal
+          title={editingProject ? 'Chỉnh sửa dự án' : 'Tạo dự án mới'}
+          open={modalVisible}
           onCancel={handleModalCancel}
-          onFinish={handleFormFinish}
-          initialValues={editingProject}
-          loading={loading}
-          users={users}
-          projects={allProjects.filter(p => !editingProject || p._id !== editingProject._id)}
-          currentUser={currentUser}
-        />
-      </Modal>
+          footer={null}
+          width={700}
+          destroyOnClose
+        >
+          <ProjectForm
+            visible={modalVisible}
+            onCancel={handleModalCancel}
+            onFinish={handleFormFinish}
+            initialValues={editingProject}
+            loading={loading}
+            users={users}
+            currentUser={currentUser}
+            isParentProject={true} // Đây là dự án cha do Manager tạo
+            autoAssignToCreator={!editingProject}
+          />
+        </Modal>
+      )}
     </div>
   );
 };

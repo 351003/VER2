@@ -1,5 +1,5 @@
 // services/projectService.js
-import { getApiClient, getAuthToken, API_CONFIG } from './api';
+import { apiClientV1, apiClientV3, API_CONFIG } from './api';
 
 // Projects API endpoints
 const PROJECT_ENDPOINTS = {
@@ -16,13 +16,112 @@ const PROJECT_ENDPOINTS = {
     EDIT: '/projects/comment/edit',
     DELETE: '/projects/comment/delete'
   },
-  UPLOAD: '/upload' // Thêm endpoint upload
+  UPLOAD: '/upload'
+};
+
+// Helper để xác định API client dựa trên role của user
+const getApiClientByRole = () => {
+  // Lấy thông tin user từ localStorage
+  const userStr = localStorage.getItem('user');
+  if (!userStr) return apiClientV1; // Mặc định dùng V1
+  
+  try {
+    const user = JSON.parse(userStr);
+    // Nếu là MANAGER, dùng V3, ngược lại dùng V1
+    return user.role === 'MANAGER' ? apiClientV3 : apiClientV1;
+  } catch (error) {
+    console.error('Error parsing user data:', error);
+    return apiClientV1;
+  }
+};
+// ========== XỬ LÝ COMMENT ==========
+
+// Thêm comment - Dùng POST /api/v1/projects/comment/:id
+export const addComment = async (projectId, comment) => {
+  try {
+    // Comment luôn dùng API V1 (User route)
+    const response = await apiClientV1.post(`${PROJECT_ENDPOINTS.COMMENT.ADD}/${projectId}`, { 
+      comment 
+    });
+    
+    return {
+      success: response?.code === 200,
+      message: response?.message || 'Thêm comment thành công',
+      data: response?.data || response
+    };
+  } catch (error) {
+    console.error('Error adding comment:', error);
+    
+    // Tạo error message phù hợp
+    let errorMessage = 'Thêm comment thất bại!';
+    if (error.message.includes('401')) {
+      errorMessage = 'Bạn cần đăng nhập để thêm comment!';
+    }
+    
+    throw new Error(errorMessage);
+  }
+};
+
+// Sửa comment - Dùng PATCH /api/v1/projects/comment/edit/:id
+export const editComment = async (commentId, comment) => {
+  try {
+    // Comment luôn dùng API V1
+    const response = await apiClientV1.patch(
+      `${PROJECT_ENDPOINTS.COMMENT.EDIT}/${commentId}`, 
+      { comment }
+    );
+    
+    return {
+      success: response?.code === 200,
+      message: response?.message || 'Sửa comment thành công',
+      data: response?.data || response
+    };
+  } catch (error) {
+    console.error('Error editing comment:', error);
+    
+    let errorMessage = 'Sửa comment thất bại!';
+    if (error.message.includes('400') && error.message.includes('khong duoc sua')) {
+      errorMessage = 'Bạn không được sửa comment của người khác!';
+    }
+    
+    throw new Error(errorMessage);
+  }
+};
+
+// Xóa comment - Dùng PATCH /api/v1/projects/comment/delete/:id (soft delete)
+export const deleteComment = async (commentId) => {
+  try {
+    // Comment luôn dùng API V1
+    const response = await apiClientV1.patch(
+      `${PROJECT_ENDPOINTS.COMMENT.DELETE}/${commentId}`
+    );
+    
+    return {
+      success: response?.code === 200,
+      message: response?.message || 'Xóa comment thành công',
+      data: response?.data || response
+    };
+  } catch (error) {
+    console.error('Error deleting comment:', error);
+    
+    let errorMessage = 'Xóa comment thất bại!';
+    if (error.message.includes('400') && error.message.includes('khong duoc xoa')) {
+      errorMessage = 'Bạn không được xóa comment của người khác!';
+    }
+    
+    throw new Error(errorMessage);
+  }
+};
+
+// Helper để xác định API client cho project detail (cả 2 route đều giống)
+const getDetailApiClient = () => {
+  return apiClientV1; // Dùng V1 vì cả 2 đều giống
 };
 
 // Thêm hàm upload file riêng
 export const uploadFile = async (file) => {
   try {
-    const token = getAuthToken();
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     const formData = new FormData();
     formData.append('file', file);
     
@@ -46,12 +145,22 @@ export const uploadFile = async (file) => {
   }
 };
 
-// Lấy danh sách dự án
+// Lấy danh sách dự án - Backend đã tự lọc theo user
 export const getProjects = async (params = {}) => {
   try {
-    const apiClient = getApiClient();
+    const apiClient = getApiClientByRole();
     const response = await apiClient.get(PROJECT_ENDPOINTS.LIST, { params });
-    return response;
+    
+    // Format response để phù hợp với frontend
+    return {
+      success: true,
+      data: response || [],
+      pagination: {
+        page: params.page || 1,
+        pageSize: params.limit || 10,
+        total: response?.length || 0
+      }
+    };
   } catch (error) {
     console.error('Error fetching projects:', error);
     throw error;
@@ -61,72 +170,100 @@ export const getProjects = async (params = {}) => {
 // Lấy chi tiết dự án
 export const getProjectDetail = async (id) => {
   try {
-    const apiClient = getApiClient();
+    const apiClient = getDetailApiClient();
     const response = await apiClient.get(`${PROJECT_ENDPOINTS.DETAIL}/${id}`);
-    return response;
+    
+    return {
+      success: response?.code === 200 || response?.success === true,
+      data: response?.data || response,
+      comments: response?.comment || []
+    };
   } catch (error) {
     console.error('Error fetching project detail:', error);
     throw error;
   }
 };
 
-// Tạo dự án mới (với upload ảnh)
+// Tạo dự án mới
 export const createProject = async (formData) => {
   try {
-    const token = getAuthToken();
+    const isFormData = formData instanceof FormData;
     
-    // Nếu là FormData (có file upload)
-    if (formData instanceof FormData) {
-      // Debug: Kiểm tra FormData
-      console.log('FormData contents:');
-      for (let pair of formData.entries()) {
-        console.log(pair[0] + ': ' + (pair[1] instanceof File ? `File: ${pair[1].name}` : pair[1]));
-      }
+    // Xác định xem dùng route nào
+    const userStr = localStorage.getItem('user');
+    let apiClient;
+    
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      // Manager tạo dự án cha dùng V3 (có upload file)
+      // User tạo sub-project dùng V1 (không upload file)
+      apiClient = user.role === 'MANAGER' ? apiClientV3 : apiClientV1;
+    } else {
+      apiClient = apiClientV1; // Mặc định
+    }
+    
+    let response;
+    
+    if (isFormData) {
+      // Xử lý FormData (Manager tạo dự án với upload file)
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const url = `${apiClient.defaults.baseURL}${PROJECT_ENDPOINTS.CREATE}`;
       
-      const apiClient = getApiClient();
-      const baseURL = apiClient.defaults.baseURL;
-      
-      // Sử dụng fetch để upload file
-      const response = await fetch(`${baseURL}${PROJECT_ENDPOINTS.CREATE}`, {
+      response = await fetch(url, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
-          // Không set Content-Type, browser sẽ tự set boundary
         },
         body: formData
       });
       
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Upload error response:', errorText);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      const result = await response.json();
-      return result;
+      response = await response.json();
     } else {
-      // Nếu không có file, dùng axios bình thường
-      const apiClient = getApiClient();
-      const response = await apiClient.post(PROJECT_ENDPOINTS.CREATE, formData);
-      return response;
+      // Xử lý JSON data (User tạo sub-project)
+      response = await apiClient.post(PROJECT_ENDPOINTS.CREATE, formData);
     }
+    
+    return {
+      success: response?.code === 200 || response?.success === true,
+      message: response?.message || 'Thành công',
+      data: response?.data || response
+    };
   } catch (error) {
     console.error('Error creating project:', error);
     throw error;
   }
 };
 
-// Cập nhật dự án (với upload ảnh)
+// Cập nhật dự án
 export const updateProject = async (id, formData) => {
   try {
-    const token = getAuthToken();
+    const isFormData = formData instanceof FormData;
     
-    // Nếu là FormData (có file upload)
-    if (formData instanceof FormData) {
-      const apiClient = getApiClient();
-      const baseURL = apiClient.defaults.baseURL;
+    // Xác định xem dùng route nào
+    const userStr = localStorage.getItem('user');
+    let apiClient;
+    
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      // Manager dùng V3 (có upload file)
+      // User dùng V1 (không upload file)
+      apiClient = user.role === 'MANAGER' ? apiClientV3 : apiClientV1;
+    } else {
+      apiClient = apiClientV1;
+    }
+    
+    let response;
+    
+    if (isFormData) {
+      // Xử lý FormData
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const url = `${apiClient.defaults.baseURL}${PROJECT_ENDPOINTS.EDIT}/${id}`;
       
-      const response = await fetch(`${baseURL}${PROJECT_ENDPOINTS.EDIT}/${id}`, {
+      response = await fetch(url, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -138,25 +275,33 @@ export const updateProject = async (id, formData) => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      return await response.json();
+      response = await response.json();
     } else {
-      // Nếu không có file
-      const apiClient = getApiClient();
-      const response = await apiClient.patch(`${PROJECT_ENDPOINTS.EDIT}/${id}`, formData);
-      return response;
+      // Xử lý JSON data
+      response = await apiClient.patch(`${PROJECT_ENDPOINTS.EDIT}/${id}`, formData);
     }
+    
+    return {
+      success: response?.code === 200 || response?.success === true,
+      message: response?.message || 'Cập nhật thành công',
+      data: response?.data || response
+    };
   } catch (error) {
     console.error('Error updating project:', error);
     throw error;
   }
 };
 
-// Xóa dự án (xóa mềm)
+// Xóa dự án
 export const deleteProject = async (id) => {
   try {
-    const apiClient = getApiClient();
+    const apiClient = getApiClientByRole();
     const response = await apiClient.patch(`${PROJECT_ENDPOINTS.DELETE}/${id}`);
-    return response;
+    
+    return {
+      success: response?.code === 200 || response?.success === true,
+      message: response?.message || 'Xóa thành công'
+    };
   } catch (error) {
     console.error('Error deleting project:', error);
     throw error;
@@ -166,9 +311,13 @@ export const deleteProject = async (id) => {
 // Thay đổi trạng thái dự án
 export const changeProjectStatus = async (id, status) => {
   try {
-    const apiClient = getApiClient();
+    const apiClient = getApiClientByRole();
     const response = await apiClient.patch(`${PROJECT_ENDPOINTS.CHANGE_STATUS}/${id}`, { status });
-    return response;
+    
+    return {
+      success: response?.code === 200 || response?.success === true,
+      message: response?.message || 'Cập nhật trạng thái thành công'
+    };
   } catch (error) {
     console.error('Error changing project status:', error);
     throw error;
@@ -178,9 +327,13 @@ export const changeProjectStatus = async (id, status) => {
 // Thay đổi độ ưu tiên dự án
 export const changeProjectPriority = async (id, priority) => {
   try {
-    const apiClient = getApiClient();
+    const apiClient = getApiClientByRole();
     const response = await apiClient.patch(`${PROJECT_ENDPOINTS.CHANGE_PRIORITY}/${id}`, { priority });
-    return response;
+    
+    return {
+      success: response?.code === 200 || response?.success === true,
+      message: response?.message || 'Cập nhật độ ưu tiên thành công'
+    };
   } catch (error) {
     console.error('Error changing project priority:', error);
     throw error;
@@ -190,51 +343,42 @@ export const changeProjectPriority = async (id, priority) => {
 // Thay đổi nhiều dự án cùng lúc
 export const changeMultipleProjects = async (ids, key, value) => {
   try {
-    const apiClient = getApiClient();
+    const apiClient = getApiClientByRole();
     const response = await apiClient.patch(PROJECT_ENDPOINTS.CHANGE_MULTI, {
       ids,
       key,
       value
     });
-    return response;
+    
+    return {
+      success: response?.code === 200 || response?.success === true,
+      message: response?.message || 'Cập nhật hàng loạt thành công'
+    };
   } catch (error) {
     console.error('Error changing multiple projects:', error);
     throw error;
   }
 };
 
-// Thêm comment
-export const addComment = async (projectId, comment) => {
-  try {
-    const apiClient = getApiClient();
-    const response = await apiClient.post(`${PROJECT_ENDPOINTS.COMMENT.ADD}/${projectId}`, { comment });
-    return response;
-  } catch (error) {
-    console.error('Error adding comment:', error);
-    throw error;
-  }
-};
 
-// Sửa comment
-export const editComment = async (commentId, comment) => {
-  try {
-    const apiClient = getApiClient();
-    const response = await apiClient.patch(`${PROJECT_ENDPOINTS.COMMENT.EDIT}/${commentId}`, { comment });
-    return response;
-  } catch (error) {
-    console.error('Error editing comment:', error);
-    throw error;
-  }
-};
 
-// Xóa comment
-export const deleteComment = async (commentId) => {
+// Lấy sub-projects (dự án con)
+export const getSubProjects = async (parentId, params = {}) => {
   try {
-    const apiClient = getApiClient();
-    const response = await apiClient.patch(`${PROJECT_ENDPOINTS.COMMENT.DELETE}/${commentId}`);
-    return response;
+    // Sub-project luôn dùng API V1 (User route)
+    const response = await apiClientV1.get(PROJECT_ENDPOINTS.LIST, {
+      params: {
+        ...params,
+        parentId // Thêm parentId để filter
+      }
+    });
+    
+    return {
+      success: true,
+      data: response || []
+    };
   } catch (error) {
-    console.error('Error deleting comment:', error);
+    console.error('Error fetching sub-projects:', error);
     throw error;
   }
 };
@@ -243,6 +387,7 @@ export const deleteComment = async (commentId) => {
 export default {
   getProjects,
   getProjectDetail,
+  getSubProjects,
   createProject,
   updateProject,
   deleteProject,
@@ -252,5 +397,5 @@ export default {
   addComment,
   editComment,
   deleteComment,
-  uploadFile // Thêm uploadFile vào export
+  uploadFile
 };
