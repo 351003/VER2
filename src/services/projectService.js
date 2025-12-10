@@ -19,27 +19,43 @@ const PROJECT_ENDPOINTS = {
   UPLOAD: '/upload'
 };
 
-// Helper để xác định API client dựa trên role của user
+// Helper để xác định API client dựa trên role của user - FIXED (case insensitive)
 const getApiClientByRole = () => {
-  // Lấy thông tin user từ localStorage
   const userStr = localStorage.getItem('user');
-  if (!userStr) return apiClientV1; // Mặc định dùng V1
+  if (!userStr) return apiClientV1;
   
   try {
     const user = JSON.parse(userStr);
-    // Nếu là MANAGER, dùng V3, ngược lại dùng V1
-    return user.role === 'MANAGER' ? apiClientV3 : apiClientV1;
+    const userRole = user.role?.toUpperCase(); // CHUYỂN THÀNH CHỮ HOA
+    return userRole === 'MANAGER' ? apiClientV3 : apiClientV1;
   } catch (error) {
     console.error('Error parsing user data:', error);
     return apiClientV1;
   }
 };
+
+// Helper để lấy API base URL dựa trên role - FIXED (case insensitive)
+const getApiBaseUrlByRole = () => {
+  const userStr = localStorage.getItem('user');
+  if (!userStr) return `${API_CONFIG.BASE_URL}/api/v1`;
+  
+  try {
+    const user = JSON.parse(userStr);
+    const userRole = user.role?.toUpperCase(); // CHUYỂN THÀNH CHỮ HOA
+    return userRole === 'MANAGER' 
+      ? `${API_CONFIG.BASE_URL}/api/v3` 
+      : `${API_CONFIG.BASE_URL}/api/v1`;
+  } catch (error) {
+    console.error('Error parsing user data:', error);
+    return `${API_CONFIG.BASE_URL}/api/v1`;
+  }
+};
+
 // ========== XỬ LÝ COMMENT ==========
 
 // Thêm comment - Dùng POST /api/v1/projects/comment/:id
 export const addComment = async (projectId, comment) => {
   try {
-    // Comment luôn dùng API V1 (User route)
     const response = await apiClientV1.post(`${PROJECT_ENDPOINTS.COMMENT.ADD}/${projectId}`, { 
       comment 
     });
@@ -52,7 +68,6 @@ export const addComment = async (projectId, comment) => {
   } catch (error) {
     console.error('Error adding comment:', error);
     
-    // Tạo error message phù hợp
     let errorMessage = 'Thêm comment thất bại!';
     if (error.message.includes('401')) {
       errorMessage = 'Bạn cần đăng nhập để thêm comment!';
@@ -65,7 +80,6 @@ export const addComment = async (projectId, comment) => {
 // Sửa comment - Dùng PATCH /api/v1/projects/comment/edit/:id
 export const editComment = async (commentId, comment) => {
   try {
-    // Comment luôn dùng API V1
     const response = await apiClientV1.patch(
       `${PROJECT_ENDPOINTS.COMMENT.EDIT}/${commentId}`, 
       { comment }
@@ -91,7 +105,6 @@ export const editComment = async (commentId, comment) => {
 // Xóa comment - Dùng PATCH /api/v1/projects/comment/delete/:id (soft delete)
 export const deleteComment = async (commentId) => {
   try {
-    // Comment luôn dùng API V1
     const response = await apiClientV1.patch(
       `${PROJECT_ENDPOINTS.COMMENT.DELETE}/${commentId}`
     );
@@ -113,9 +126,9 @@ export const deleteComment = async (commentId) => {
   }
 };
 
-// Helper để xác định API client cho project detail (cả 2 route đều giống)
+// Helper để xác định API client cho project detail
 const getDetailApiClient = () => {
-  return apiClientV1; // Dùng V1 vì cả 2 đều giống
+  return apiClientV1;
 };
 
 // Thêm hàm upload file riêng
@@ -125,7 +138,6 @@ export const uploadFile = async (file) => {
     const formData = new FormData();
     formData.append('file', file);
     
-    // Sử dụng API_CONFIG.BASE_URL thay vì hardcode
     const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1${PROJECT_ENDPOINTS.UPLOAD}`, {
       method: 'POST',
       headers: {
@@ -151,7 +163,6 @@ export const getProjects = async (params = {}) => {
     const apiClient = getApiClientByRole();
     const response = await apiClient.get(PROJECT_ENDPOINTS.LIST, { params });
     
-    // Format response để phù hợp với frontend
     return {
       success: true,
       data: response || [],
@@ -184,32 +195,61 @@ export const getProjectDetail = async (id) => {
   }
 };
 
-// Tạo dự án mới
+// Tạo dự án mới - FIXED VERSION (case insensitive)
 export const createProject = async (formData) => {
   try {
+    console.log('=== DEBUG CREATE PROJECT ===');
+    
     const isFormData = formData instanceof FormData;
+    console.log('Is FormData:', isFormData);
     
     // Xác định xem dùng route nào
     const userStr = localStorage.getItem('user');
+    console.log('User from localStorage:', userStr);
+    
+    let apiBaseUrl;
     let apiClient;
     
     if (userStr) {
       const user = JSON.parse(userStr);
-      // Manager tạo dự án cha dùng V3 (có upload file)
-      // User tạo sub-project dùng V1 (không upload file)
-      apiClient = user.role === 'MANAGER' ? apiClientV3 : apiClientV1;
+      console.log('User role:', user.role);
+      
+      // CHUYỂN ROLE THÀNH CHỮ HOA ĐỂ SO SÁNH
+      const userRole = user.role?.toUpperCase();
+      console.log('User role uppercase:', userRole);
+      
+      // Manager tạo dự án cha dùng V3
+      // User tạo sub-project dùng V1
+      if (userRole === 'MANAGER') {
+        apiBaseUrl = `${API_CONFIG.BASE_URL}/api/v3`;
+        apiClient = apiClientV3;
+        console.log('✓ MANAGER detected, using API v3');
+      } else {
+        apiBaseUrl = `${API_CONFIG.BASE_URL}/api/v1`;
+        apiClient = apiClientV1;
+        console.log('✓ USER detected, using API v1');
+      }
     } else {
-      apiClient = apiClientV1; // Mặc định
+      apiBaseUrl = `${API_CONFIG.BASE_URL}/api/v1`;
+      apiClient = apiClientV1;
+      console.log('⚠ No user found, using default API v1');
     }
+    
+    console.log('API Base URL:', apiBaseUrl);
+    console.log('API Client:', apiClient === apiClientV3 ? 'V3' : 'V1');
     
     let response;
     
     if (isFormData) {
       // Xử lý FormData (Manager tạo dự án với upload file)
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      const url = `${apiClient.defaults.baseURL}${PROJECT_ENDPOINTS.CREATE}`;
+      console.log('Token exists:', !!token);
       
-      response = await fetch(url, {
+      // DÙNG apiBaseUrl TRỰC TIẾP
+      const apiUrl = `${apiBaseUrl}${PROJECT_ENDPOINTS.CREATE}`;
+      console.log('Final API URL:', apiUrl);
+      
+      response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -217,51 +257,95 @@ export const createProject = async (formData) => {
         body: formData
       });
       
+      console.log('Fetch response status:', response.status);
+      console.log('Fetch response ok:', response.ok);
+      
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        console.error('Fetch error response:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
       }
       
       response = await response.json();
+      console.log('Fetch response JSON:', response);
     } else {
-      // Xử lý JSON data (User tạo sub-project)
+      // Xử lý JSON data (User tạo sub-project) - dùng axios client
+      console.log('JSON data:', formData);
       response = await apiClient.post(PROJECT_ENDPOINTS.CREATE, formData);
+      console.log('Axios response:', response);
     }
     
+    console.log('=== CREATE PROJECT SUCCESS ===');
     return {
       success: response?.code === 200 || response?.success === true,
       message: response?.message || 'Thành công',
       data: response?.data || response
     };
   } catch (error) {
+    console.error('=== ERROR IN CREATE PROJECT ===');
     console.error('Error creating project:', error);
-    throw error;
+    console.error('Error stack:', error.stack);
+    
+    let errorMessage = 'Tạo dự án thất bại!';
+    if (error.message.includes('401')) {
+      errorMessage = 'Bạn cần đăng nhập để tạo dự án!';
+    } else if (error.message.includes('403')) {
+      errorMessage = 'Bạn không có quyền tạo dự án!';
+    } else if (error.message.includes('404')) {
+      errorMessage = 'API không tồn tại hoặc không tìm thấy!';
+    }
+    
+    throw new Error(`${errorMessage} Chi tiết: ${error.message}`);
   }
 };
 
-// Cập nhật dự án
+// Cập nhật dự án - FIXED VERSION (case insensitive)
 export const updateProject = async (id, formData) => {
   try {
+    console.log('=== DEBUG UPDATE PROJECT ===');
+    console.log('Updating project ID:', id);
+    
     const isFormData = formData instanceof FormData;
+    console.log('Is FormData:', isFormData);
     
     // Xác định xem dùng route nào
     const userStr = localStorage.getItem('user');
+    let apiBaseUrl;
     let apiClient;
     
     if (userStr) {
       const user = JSON.parse(userStr);
-      // Manager dùng V3 (có upload file)
-      // User dùng V1 (không upload file)
-      apiClient = user.role === 'MANAGER' ? apiClientV3 : apiClientV1;
+      console.log('User role:', user.role);
+      
+      // CHUYỂN ROLE THÀNH CHỮ HOA ĐỂ SO SÁNH
+      const userRole = user.role?.toUpperCase();
+      console.log('User role uppercase:', userRole);
+      
+      if (userRole === 'MANAGER') {
+        apiBaseUrl = `${API_CONFIG.BASE_URL}/api/v3`;
+        apiClient = apiClientV3;
+        console.log('✓ MANAGER detected, using API v3');
+      } else {
+        apiBaseUrl = `${API_CONFIG.BASE_URL}/api/v1`;
+        apiClient = apiClientV1;
+        console.log('✓ USER detected, using API v1');
+      }
     } else {
+      apiBaseUrl = `${API_CONFIG.BASE_URL}/api/v1`;
       apiClient = apiClientV1;
+      console.log('⚠ No user found, using default API v1');
     }
+    
+    console.log('API Base URL:', apiBaseUrl);
     
     let response;
     
     if (isFormData) {
       // Xử lý FormData
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      const url = `${apiClient.defaults.baseURL}${PROJECT_ENDPOINTS.EDIT}/${id}`;
+      const url = `${apiBaseUrl}${PROJECT_ENDPOINTS.EDIT}/${id}`;
+      
+      console.log('PATCH URL:', url);
       
       response = await fetch(url, {
         method: 'PATCH',
@@ -271,23 +355,32 @@ export const updateProject = async (id, formData) => {
         body: formData
       });
       
+      console.log('Fetch response status:', response.status);
+      
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        console.error('Fetch error response:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
       }
       
       response = await response.json();
     } else {
       // Xử lý JSON data
+      console.log('JSON update data:', formData);
       response = await apiClient.patch(`${PROJECT_ENDPOINTS.EDIT}/${id}`, formData);
+      console.log('Axios response:', response);
     }
     
+    console.log('=== UPDATE PROJECT SUCCESS ===');
     return {
       success: response?.code === 200 || response?.success === true,
       message: response?.message || 'Cập nhật thành công',
       data: response?.data || response
     };
   } catch (error) {
+    console.error('=== ERROR IN UPDATE PROJECT ===');
     console.error('Error updating project:', error);
+    console.error('Error details:', error.message);
     throw error;
   }
 };
@@ -360,16 +453,13 @@ export const changeMultipleProjects = async (ids, key, value) => {
   }
 };
 
-
-
 // Lấy sub-projects (dự án con)
 export const getSubProjects = async (parentId, params = {}) => {
   try {
-    // Sub-project luôn dùng API V1 (User route)
     const response = await apiClientV1.get(PROJECT_ENDPOINTS.LIST, {
       params: {
         ...params,
-        parentId // Thêm parentId để filter
+        parentId
       }
     });
     
