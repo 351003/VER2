@@ -44,7 +44,10 @@ const ProjectForm = ({
   users = [], 
   currentUser,
   isParentProject = true,
-  autoAssignToCreator = true // Thêm prop này để tự động assign người tạo là phụ trách
+  autoAssignToCreator = true, // Thêm prop này để tự động assign người tạo là phụ trách
+  isCreatingTask = false, // THÊM PROP MỚI: đang tạo công việc
+  parentProjectId = null // THÊM: ID dự án cha (cho task)
+  
 }) => {
   const [form] = Form.useForm();
   const [thumbnailFile, setThumbnailFile] = useState(null);
@@ -80,14 +83,14 @@ const ProjectForm = ({
         
         // Set default values for new project
         const defaultValues = {
-          status: 'not-started',
+          status: isCreatingTask ? 'not-started' : 'not-started',
           priority: 'medium'
         };
         
         form.setFieldsValue(defaultValues);
       }
     }
-  }, [visible, initialValues, form]);
+  }, [visible, initialValues, form, isCreatingTask]);
 
   const handleFileChange = (info) => {
     if (info.file.status === 'uploading') {
@@ -142,38 +145,70 @@ const ProjectForm = ({
   };
 
   const handleFinish = (values) => {
-    const formData = new FormData();
+  const formData = new FormData();
+  
+  console.log('=== DEBUG FORM VALUES ===');
+  console.log('All values:', values);
+  console.log('listUser specifically:', values.listUser);
+  console.log('listUser exists?', 'listUser' in values);
+  
+  // Thêm các field chính của dự án - CHỈNH SỬA CÁCH NÀY
+  Object.keys(values).forEach(key => {
+    const value = values[key];
+    console.log(`Processing ${key}:`, value, 'type:', typeof value);
     
-    // Thêm các field chính của dự án
-    Object.keys(values).forEach(key => {
-      if (values[key] !== undefined && values[key] !== null) {
-        if (key === 'timeStart' || key === 'timeFinish') {
-          formData.append(key, values[key].format('YYYY-MM-DD'));
-        } else if (key === 'listUser' && Array.isArray(values[key])) {
-          formData.append(key, JSON.stringify(values[key]));
+    if (value !== undefined && value !== null && value !== '') {
+      if (key === 'timeStart' || key === 'timeFinish') {
+        formData.append(key, value.format('YYYY-MM-DD'));
+      } else if (key === 'listUser') {
+        // 🎯 QUAN TRỌNG: Xử lý đặc biệt cho listUser
+        if (Array.isArray(value) && value.length > 0) {
+          // Cách 1: Thử append từng user ID
+          value.forEach((userId, index) => {
+            formData.append(`listUser[${index}]`, userId);
+          });
+          console.log(`Added ${value.length} users to FormData`);
         } else {
-          formData.append(key, values[key]);
+          console.log('listUser is empty or not array, skipping');
         }
+      } else {
+        formData.append(key, value);
       }
-    });
-    
-    // QUAN TRỌNG: Người tạo dự án chính là người phụ trách
-    if (currentUser?.id) {
-      // Người tạo = Người phụ trách
-      formData.append('assignee_id', currentUser.id);
-      formData.append('createdBy', currentUser.id);
     }
-    
-    // Thêm thumbnail file nếu có
-    if (thumbnailFile) {
-      formData.append('thumbnail', thumbnailFile);
-    } else if (initialValues?.thumbnail && !thumbnailUrl.startsWith('blob:')) {
-      // Nếu đang chỉnh sửa và có thumbnail cũ (không phải blob URL)
-      formData.append('thumbnail', initialValues.thumbnail);
-    }
-    
-    onFinish(formData);
-  };
+  });
+  
+  // Debug: Kiểm tra tất cả entries trong FormData
+  console.log('=== FORM DATA ENTRIES ===');
+  for (let [key, value] of formData.entries()) {
+    console.log(`${key}:`, value);
+  }
+  console.log('Total entries:', Array.from(formData.entries()).length);
+  
+  // QUAN TRỌNG: Người tạo dự án chính là người phụ trách
+  if (currentUser?.id) {
+    formData.append('assignee_id', currentUser.id);
+    formData.append('createdBy', currentUser.id);
+  }
+  
+  // Nếu đang tạo công việc (task), thêm projectParentId
+  if (isCreatingTask && parentProjectId) {
+    formData.append('projectParentId', parentProjectId);
+  }
+  
+  // Thêm thumbnail file nếu có
+  if (thumbnailFile) {
+    formData.append('thumbnail', thumbnailFile);
+  } else if (initialValues?.thumbnail && !thumbnailUrl.startsWith('blob:')) {
+    formData.append('thumbnail', initialValues.thumbnail);
+  }
+  
+  console.log('=== FINAL FORM DATA BEFORE SUBMIT ===');
+  for (let [key, value] of formData.entries()) {
+    console.log(`${key}:`, value);
+  }
+  
+  onFinish(formData);
+};
 
   // Validation cho timeFinish không được trước timeStart
   const validateDates = (_, value) => {
@@ -201,18 +236,27 @@ const ProjectForm = ({
       onFinish={handleFinish}
       disabled={loading}
     >
-      
+      {/* Hiển thị Alert nếu đang tạo công việc */}
+      {isCreatingTask && !isEditing && (
+        <Alert
+          message="Tạo công việc mới"
+          description="Bạn sẽ là người phụ trách công việc này. Có thể thêm thành viên từ dự án cha."
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+      )}
 
       {/* Tên dự án */}
       <Row gutter={16}>
         <Col span={24}>
           <Form.Item
             name="title"
-            label="Tên dự án"
-            rules={[{ required: true, message: 'Vui lòng nhập tên dự án!' }]}
+            label={isCreatingTask ? "Tên công việc" : "Tên dự án"}
+            rules={[{ required: true, message: isCreatingTask ? 'Vui lòng nhập tên công việc!' : 'Vui lòng nhập tên dự án!' }]}
           >
             <Input 
-              placeholder="Nhập tên dự án..." 
+              placeholder={isCreatingTask ? "Nhập tên công việc..." : "Nhập tên dự án..."}  
               size="large"
             />
           </Form.Item>
@@ -224,14 +268,14 @@ const ProjectForm = ({
         <Col span={24}>
           <Form.Item
             name="content"
-            label="Mô tả dự án"
+            label={isCreatingTask ? "Mô tả công việc" : "Mô tả dự án"}
             rules={[
-          { required: true, message: 'Vui lòng nhập mô tả dự án!' }
-        ]}
+              { required: !isCreatingTask, message: 'Vui lòng nhập mô tả dự án!' }
+            ]}
           >
             <TextArea 
               rows={3} 
-              placeholder="Mô tả chi tiết về dự án..." 
+              placeholder={isCreatingTask ? "Mô tả chi tiết về công việc..." : "Mô tả chi tiết về dự án..."}
             />
           </Form.Item>
         </Col>
@@ -243,12 +287,13 @@ const ProjectForm = ({
           <Form.Item
             name="status"
             label="Trạng thái"
-            rules={[{ required: true, message: 'Vui lòng chọn trạng thái!' }]}
+            rules={[{ required: !isCreatingTask, message: 'Vui lòng chọn trạng thái!' }]}
           >
             <Select 
               placeholder="Chọn trạng thái"
               size="large"
               suffixIcon={<ProjectOutlined />}
+              disabled={isCreatingTask && !isEditing} // Disable cho task mới
             >
               <Option value="not-started">
                 <span style={{ color: '#fa8c16' }}>Chưa bắt đầu</span>
@@ -292,7 +337,7 @@ const ProjectForm = ({
         </Col>
       </Row>
 
-      {/* Hiển thị người phụ trách (chỉ khi chỉnh sửa) */}
+      {/* Hiển thị người phụ trách (chỉ khi chỉnh sửa)
       {isEditing && initialValues && (
         <Row gutter={16}>
           <Col span={24}>
@@ -341,7 +386,7 @@ const ProjectForm = ({
             </Form.Item>
           </Col>
         </Row>
-      )}
+      )} */}
 
       {/* Thời gian */}
       <Row gutter={16}>
@@ -377,109 +422,113 @@ const ProjectForm = ({
         </Col>
       </Row>
 
-      {/* Upload ảnh thumbnail */}
-      <Row gutter={16}>
-        <Col span={24}>
-          <Form.Item label="Ảnh thumbnail">
-            <div style={{ textAlign: 'center' }}>
-              <Upload
-                name="thumbnail"
-                listType="picture-card"
-                className="avatar-uploader"
-                showUploadList={false}
-                beforeUpload={beforeUpload}
-                onChange={handleFileChange}
-                customRequest={customUploadRequest}
-                disabled={uploading || loading}
-              >
-                {thumbnailUrl ? (
-                  <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-                    <img 
-                      src={thumbnailUrl} 
-                      alt="Thumbnail" 
-                      style={{ 
-                        width: '100%', 
-                        height: '100%', 
-                        objectFit: 'cover',
-                        borderRadius: '6px'
-                      }} 
-                    />
-                    {uploading && (
-                      <div style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        background: 'rgba(0,0,0,0.5)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderRadius: '6px'
-                      }}>
-                        <Spin />
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div style={{ textAlign: 'center' }}>
-                    {uploading ? <LoadingOutlined /> : <UploadOutlined style={{ fontSize: '24px' }} />}
-                    <div style={{ marginTop: 8 }}>Click để upload ảnh</div>
-                  </div>
-                )}
-              </Upload>
-              <div style={{ marginTop: 8, fontSize: '12px', color: '#999' }}>
-                Hỗ trợ: JPG, PNG, GIF • Tối đa: 5MB • Tỷ lệ khuyến nghị: 16:9
+      {/* Upload ảnh thumbnail - CHỈ CHO DỰ ÁN CHA */}
+      {!isCreatingTask && (
+        <Row gutter={16}>
+          <Col span={24}>
+            <Form.Item label="Ảnh thumbnail">
+              <div style={{ textAlign: 'center' }}>
+                <Upload
+                  name="thumbnail"
+                  listType="picture-card"
+                  className="avatar-uploader"
+                  showUploadList={false}
+                  beforeUpload={beforeUpload}
+                  onChange={handleFileChange}
+                  customRequest={customUploadRequest}
+                  disabled={uploading || loading}
+                >
+                  {thumbnailUrl ? (
+                    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                      <img 
+                        src={thumbnailUrl} 
+                        alt="Thumbnail" 
+                        style={{ 
+                          width: '100%', 
+                          height: '100%', 
+                          objectFit: 'cover',
+                          borderRadius: '6px'
+                        }} 
+                      />
+                      {uploading && (
+                        <div style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          background: 'rgba(0,0,0,0.5)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: '6px'
+                        }}>
+                          <Spin />
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center' }}>
+                      {uploading ? <LoadingOutlined /> : <UploadOutlined style={{ fontSize: '24px' }} />}
+                      <div style={{ marginTop: 8 }}>Click để upload ảnh</div>
+                    </div>
+                  )}
+                </Upload>
+                <div style={{ marginTop: 8, fontSize: '12px', color: '#999' }}>
+                  Hỗ trợ: JPG, PNG, GIF • Tối đa: 5MB • Tỷ lệ khuyến nghị: 16:9
+                </div>
               </div>
-            </div>
-          </Form.Item>
-        </Col>
-      </Row>
+            </Form.Item>
+          </Col>
+        </Row>
+      )}
 
       {/* Thành viên tham gia */}
       <Row gutter={16}>
         <Col span={24}>
           <Form.Item
-            name="listUser"
-            label="Thành viên tham gia"
-          >
-            <Select
-              mode="multiple"
-              placeholder="Chọn thành viên tham gia dự án"
-              optionFilterProp="children"
-              showSearch
-              allowClear
-              size="large"
-              maxTagCount={3}
-              maxTagTextLength={15}
-              suffixIcon={<TeamOutlined />}
-              filterOption={(input, option) =>
-                option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
-              }
-            >
-              {users
-                .filter(u => currentUser && u._id !== currentUser.id) // Loại bỏ currentUser (vì đã là người phụ trách)
-                .map(user => (
-                  <Option key={user._id} value={user._id}>
-                    <Space>
-                      <Avatar 
-                        size="small" 
-                        src={user.avatar} 
-                        icon={<UserOutlined />} 
-                        style={{ backgroundColor: user.avatar ? 'transparent' : '#1890ff' }}
-                      />
-                      <span>{user.fullName}</span>
-                      <Text type="secondary" style={{ fontSize: '12px' }}>
-                        ({user.email})
-                      </Text>
-                    </Space>
-                  </Option>
-                ))}
-            </Select>
-            <Text type="secondary" style={{ fontSize: '12px', marginTop: '4px' }}>
-              Nhấn để chọn thành viên, có thể chọn nhiều người. Người tạo dự án sẽ tự động là thành viên và phụ trách chính.
+  name="listUser"
+  label="Thành viên tham gia"
+  valuePropName="value" // Thêm dòng này
+>
+  <Select
+    mode="multiple"
+    placeholder="Chọn thành viên tham gia dự án"
+    optionFilterProp="children"
+    showSearch
+    allowClear
+    size="large"
+    maxTagCount={3}
+    maxTagTextLength={15}
+    suffixIcon={<TeamOutlined />}
+    filterOption={(input, option) =>
+      option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+    }
+    onChange={(value) => {
+      console.log('Select onChange - listUser selected:', value);
+      form.setFieldValue('listUser', value);
+    }}
+  >
+    {users
+      .filter(u => currentUser && u._id !== currentUser.id)
+      .map(user => (
+        <Option key={user._id} value={user._id}>
+          <Space>
+            <Avatar 
+              size="small" 
+              src={user.avatar} 
+              icon={<UserOutlined />} 
+              style={{ backgroundColor: user.avatar ? 'transparent' : '#1890ff' }}
+            />
+            <span>{user.fullName}</span>
+            <Text type="secondary" style={{ fontSize: '12px' }}>
+              ({user.email})
             </Text>
-          </Form.Item>
+          </Space>
+        </Option>
+      ))}
+  </Select>
+</Form.Item>
         </Col>
       </Row>
 

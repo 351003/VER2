@@ -12,22 +12,25 @@ import {
 } from '@ant-design/icons';
 import { useAuth } from '../../contexts/AuthContext';
 
-import PermissionWrapper from '../Common/PermissionWrapper';
-
 const { Sider } = Layout;
 
 const Sidebar = ({ collapsed }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
-  const { hasPermission } = useAuth();
+  const { user, isManager } = useAuth(); // Thêm isManager
   const {
     token: { colorBgContainer },
   } = theme.useToken();
   const [openKeys, setOpenKeys] = useState([]);
-    let menuItems = [];
+  
+  // THÊM DEBUG
+  console.log('📁 SIDEBAR DEBUG:');
+  console.log('User role:', user?.role);
+  console.log('isManager():', isManager());
+  
+  let menuItems = [];
 
-  // Nếu là admin
+  // SỬA: Dùng isManager() thay vì kiểm tra string
   if (user?.role === 'admin') {
     menuItems = [
       {
@@ -37,8 +40,9 @@ const Sidebar = ({ collapsed }) => {
       },
     ];
   }
-  // Nếu là manager
-  else if (user?.role === 'manager') {
+  // SỬA: Dùng isManager() để kiểm tra
+  else if (isManager()) {
+    console.log('✅ Sidebar: Rendering manager menu');
     menuItems = [
       {
         key: '/dashboard',
@@ -49,7 +53,6 @@ const Sidebar = ({ collapsed }) => {
         key: '/tasks/team',
         icon: <CheckCircleOutlined />,
         label: 'Công việc nhóm',
-        
       },
       {
         key: '/projects',
@@ -73,8 +76,9 @@ const Sidebar = ({ collapsed }) => {
       },
     ];
   }
-  // Nếu là user thường
+  // User thường
   else {
+    console.log('✅ Sidebar: Rendering user menu');
     menuItems = [
       {
         key: '/dashboard',
@@ -119,46 +123,10 @@ const Sidebar = ({ collapsed }) => {
     ];
   }
 
-    const onOpenChange = (keys) => {
-        // Chỉ cho phép mở 1 dropdown tại một thời điểm
-        const latestOpenKey = keys.find((key) => openKeys.indexOf(key) === -1);
-        setOpenKeys(latestOpenKey ? [latestOpenKey] : []);
-    };
-  //   // Thêm menu Reports chỉ cho manager và admin
-  // if (hasPermission('view_team_reports')) {
-  //   menuItems.push({
-  //     key: '/reports',
-  //     icon: <BarChartOutlined />,
-  //     label: 'Báo Cáo',
-  //   });
-  // }
-  // // ---  Giới hạn hiển thị nếu là admin ---
-  // if (user?.role === 'admin') {
-  //   menuItems = menuItems.filter(
-  //     (item) =>
-  //       item.key === '/dashboard' ||
-  //       item.key === '/admin' ||
-  //       item.key === '/reports'
-  //   );
-  // }
-  // if (hasPermission('view_own_reports')) {
-  //   menuItems.push({
-  //     key: '/personalreports',
-  //     icon: <BarChartOutlined />,
-  //     label: 'Báo Cáo',
-  //   });
-  // }
-
-  // // Thêm menu Admin chỉ cho admin
-  // if (user?.role === 'admin') {
-  //   menuItems.push({
-  //     key: '/admin',
-  //     icon: <SettingOutlined />,
-  //     label: 'Quản Trị',
-  //   });
-  // }
-
-
+  const onOpenChange = (keys) => {
+    const latestOpenKey = keys.find((key) => openKeys.indexOf(key) === -1);
+    setOpenKeys(latestOpenKey ? [latestOpenKey] : []);
+  };
 
   const handleMenuClick = ({ key }) => {
     navigate(key);
@@ -199,11 +167,15 @@ const Sidebar = ({ collapsed }) => {
         color: '#666',
         borderBottom: '1px solid #f0f0f0'
       }}>
-        👋 Chào, <strong>{user?.name}</strong>
+        👋 Chào, <strong>{user?.fullName || user?.name || 'User'}</strong>
         <div style={{ fontSize: 10, color: '#999' }}>
           {user?.role === 'admin' && '🔧 Quản trị viên'}
-          {user?.role === 'manager' && '👔 Quản lý'}
-          {user?.role === 'user' && '👤 Người dùng'}
+          {isManager() && '👔 Quản lý'} {/* SỬA */}
+          {!isManager() && user?.role === 'user' && '👤 Người dùng'}
+        </div>
+        {/* Thêm debug info */}
+        <div style={{ fontSize: 9, color: '#ccc', marginTop: 2 }}>
+          Role: {user?.role} | isManager: {isManager() ? '✅' : '❌'}
         </div>
       </div>
       

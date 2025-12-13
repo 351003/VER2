@@ -14,22 +14,36 @@ const LoginContent = () => {
   const [activeTab, setActiveTab] = React.useState('user');
   const [form] = Form.useForm();
 
-  const onFinish = async (values) => {
-    setLoading(true);
+  // pages/Auth/Login.jsx - Sửa phần onFinish
+const onFinish = async (values) => {
+  setLoading(true);
+  
+  const isManager = activeTab === 'manager';
+  
+  console.log('🔐 Login attempt:', {
+    email: values.email,
+    isManagerTab: isManager,
+    activeTab: activeTab
+  });
+  
+  const result = await login(values.email, values.password, isManager);
+  
+  console.log('📋 Login result:', result);
+  
+  if (result.success) {
+    msg.success('Đăng nhập thành công!');
     
-    // Xác định có phải login manager không
-    const isManager = activeTab === 'manager';
-    
-    const result = await login(values.email, values.password, isManager);
-    
-    if (result.success) {
-      msg.success('Đăng nhập thành công!');
-      navigate('/dashboard'); // Luôn chuyển đến dashboard chung
-    } else {
-      msg.error(result.message || 'Đăng nhập thất bại!');
+    // Lưu user vào state nếu có
+    if (result.user) {
+      console.log('✅ User logged in:', result.user);
     }
-    setLoading(false);
-  };
+    
+    navigate('/dashboard');
+  } else {
+    msg.error(result.message || 'Đăng nhập thất bại!');
+  }
+  setLoading(false);
+};
 
   const handleTabChange = (key) => {
     setActiveTab(key);

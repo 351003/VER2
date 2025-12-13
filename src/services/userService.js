@@ -48,9 +48,29 @@ const userService = {
           search: params.search
         }
       });
-      return response;
+      
+      console.log('✅ User API Response Structure:', {
+        keys: Object.keys(response),
+        hasUsers: 'users' in response,
+        usersLength: response.users?.length,
+        fullResponse: response
+      });
+      
+      // 🎯 QUAN TRỌNG: API của bạn trả về {code: 200, message: 'Thành công', users: [...]}
+      return {
+        success: response.code === 200,
+        data: response.users || [],  // <-- DÙNG response.users
+        message: response.message,
+        code: response.code
+      };
+      
     } catch (error) {
-      throw this.handleError(error);
+      console.error('❌ Error in userService.getUsers:', error);
+      return {
+        success: false,
+        data: [],
+        message: error.message || 'Có lỗi xảy ra khi tải danh sách người dùng'
+      };
     }
   },
 

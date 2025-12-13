@@ -26,13 +26,19 @@ import NotificationList from '../Notifications/NotificationList';
 const { Header: AntHeader } = Layout;
 
 const Header = ({ collapsed, onToggle }) => {
-  const { user, logout } = useAuth();
+  const { user, logout, isManager } = useAuth();
   const { unreadCount } = useNotifications();
   const navigate = useNavigate();
   const [notificationDropdownVisible, setNotificationDropdownVisible] = useState(false);
   const {
     token: { colorBgContainer },
   } = theme.useToken();
+
+  // THÊM DEBUG
+  console.log('🏢 HEADER DEBUG:');
+  console.log('User role:', user?.role);
+  console.log('isManager():', isManager());
+  console.log('User fullName:', user?.fullName);
 
   const getUserMenuItems = () => {
     const items = [
@@ -48,12 +54,16 @@ const Header = ({ collapsed, onToggle }) => {
       },
     ];
 
+    // CHỈ admin mới có menu Admin
     if (user?.role === 'admin') {
       items.unshift({
         key: 'admin',
         icon: <CrownOutlined />,
         label: 'Quản trị',
-        style: { color: '#ff4d4f' }
+        style: { 
+          color: '#ff4d4f',
+          fontWeight: 'bold'
+        }
       });
     }
 
@@ -71,15 +81,36 @@ const Header = ({ collapsed, onToggle }) => {
     return items;
   };
 
-  const getRoleText = (role) => {
-    const roleMap = {
-      'admin': 'Quản trị viên',
-      'manager': 'Quản lý',
-      'user': 'Người dùng',
-      
-    };
-    return roleMap[role] || 'Người dùng';
+  const getRoleText = () => {
+    if (user?.role === 'admin') {
+      return 'Quản trị viên';
+    } else if (isManager()) {
+      return 'Quản lý';
+    } else {
+      return 'Người dùng';
+    }
   };
+
+  const getRoleColor = () => {
+    if (user?.role === 'admin') {
+      return '#ff4d4f'; // Màu đỏ cho admin
+    } else if (isManager()) {
+      return '#1890ff'; // Màu xanh cho manager
+    } else {
+      return '#666'; // Màu xám cho user
+    }
+  };
+
+  const getRoleIcon = () => {
+    if (user?.role === 'admin') {
+      return '👑';
+    } else if (isManager()) {
+      return '👔';
+    } else {
+      return '👤';
+    }
+  };
+
   const notificationDropdown = (
     <div style={{ width: 400 }}>
       <NotificationList 
@@ -91,8 +122,8 @@ const Header = ({ collapsed, onToggle }) => {
   return (
     <AntHeader
       style={{
-        position: 'sticky',     // 🟢 Giữ header cố định khi cuộn
-        top: 0,                 // 🟢 Dính sát mép trên
+        position: 'sticky',
+        top: 0,
         zIndex: 1000, 
         padding: '0 24px',
         background: colorBgContainer,
@@ -108,6 +139,34 @@ const Header = ({ collapsed, onToggle }) => {
           onClick: onToggle,
           style: { fontSize: 18, cursor: 'pointer' },
         })}
+        
+        {/* Thêm thông tin role vào header
+        <div style={{ 
+          marginLeft: 20, 
+          padding: '4px 12px', 
+          background: isManager() ? '#f0f5ff' : '#f6ffed',
+          borderRadius: '12px',
+          fontSize: '12px',
+          fontWeight: '500',
+          color: getRoleColor(),
+          border: `1px solid ${getRoleColor()}20`,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px'
+        }}>
+          <span>{getRoleIcon()}</span>
+          <span>{getRoleText()}</span>
+          {/* Debug info chỉ hiển thị trong dev */}
+          {/* {process.env.NODE_ENV === 'development' && (
+            <span style={{ 
+              fontSize: '10px', 
+              color: '#999',
+              marginLeft: '4px'
+            }}>
+              ({user?.role})
+            </span>
+          )}
+        </div> */} 
       </div>
 
       <Space size="large">
@@ -161,13 +220,27 @@ const Header = ({ collapsed, onToggle }) => {
           }}
           placement="bottomRight"
         >
-          <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ 
+            cursor: 'pointer', 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 12,
+            padding: '8px',
+            borderRadius: '8px',
+            transition: 'background 0.3s',
+            ':hover': {
+              background: '#f5f5f5'
+            }
+          }}>
             <Avatar 
               size="default" 
               icon={<UserOutlined />} 
               src={user?.avatar}
               style={{
-                border: user?.role === 'admin' ? '2px solid #ff4d4f' : 'none'
+                border: user?.role === 'admin' ? '2px solid #ff4d4f' : 
+                        isManager() ? '2px solid #1890ff' : 'none',
+                background: user?.role === 'admin' ? '#fff2f0' : 
+                           isManager() ? '#f0f5ff' : '#f5f5f5'
               }}
             />
             <div style={{ 
@@ -182,14 +255,18 @@ const Header = ({ collapsed, onToggle }) => {
                 fontWeight: 600,
                 color: '#000'
               }}>
-                {user?.name || user?.email || 'Người dùng'}
+                {user?.fullName || user?.name || user?.email || 'Người dùng'}
               </div>
               <div style={{ 
                 fontSize: 12, 
-                color: user?.role === 'admin' ? '#ff4d4f' : '#666',
-                fontWeight: user?.role === 'admin' ? 500 : 400
+                color: getRoleColor(),
+                fontWeight: 500,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4
               }}>
-                {getRoleText(user?.role)}
+                <span>{getRoleIcon()}</span>
+                <span>{getRoleText()}</span>
               </div>
             </div>
           </div>

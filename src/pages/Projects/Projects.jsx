@@ -34,14 +34,16 @@ import { useNavigate } from 'react-router-dom';
 import ProjectCard from '../../components/Projects/ProjectCard';
 import ProjectForm from '../../components/Projects/ProjectForm';
 import { useAuth } from '../../contexts/AuthContext';
+import userService from '../../services/userService';
 import projectService from '../../services/projectService';
 import debounce from 'lodash/debounce';
-
+import axios from 'axios';
 const { Title } = Typography;
 const { Option } = Select;
 const { TabPane } = Tabs;
 
 const ProjectsContent = () => {
+  const { modal } = App.useApp();
   const [projects, setProjects] = useState([]);
   const [filteredProjects, setFilteredProjects] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -61,45 +63,77 @@ const ProjectsContent = () => {
   
   const [sortField, setSortField] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState('desc');
-  const {hasPermission, user: currentUser } = useAuth();
-
+  
+  const { user: currentUser, isManager, getUserId } = useAuth();
+  
   const [users, setUsers] = useState([]);
-  const [isManager, setIsManager] = useState(false);
   
   useEffect(() => {
     if (currentUser) {
-      const managerRoles = ['manager', 'MANAGER'];
-      setIsManager(managerRoles.includes(currentUser.role));
+      console.log('🔍 Current User in Projects:', {
+        id: getUserId(),
+        _id: currentUser._id,
+        idField: currentUser.id,
+        role: currentUser.role,
+        isManager: isManager(),
+        fullName: currentUser.fullName
+      });
+      
       loadUsers();
       loadProjects();
     }
   }, [currentUser, pagination.current, pagination.pageSize, sortField, sortOrder]);
 
   useEffect(() => {
+    if (!modalVisible && editingProject) {
+      console.log('Modal closed after editing, reloading projects...');
+      loadProjects();
+      setEditingProject(null);
+    }
+  }, [modalVisible, editingProject]);
+
+  useEffect(() => {
     filterProjects();
   }, [projects, searchText, filterStatus, filterPriority, activeTab]);
 
-  const loadUsers = async () => {
-    try {
-      // Fetch users từ API users nếu có
-      // const response = await userService.getUsers();
-      // setUsers(response.data);
+  // Projects.jsx - sửa hàm loadUsers
+const loadUsers = async () => {
+  try {
+    console.log('=== DEBUG Projects.jsx loadUsers ===');
+    
+    const response = await userService.getUsers();
+    
+    console.log('User service response:', response);
+    console.log('Response success:', response.success);
+    console.log('Response data (users array):', response.data);
+    console.log('Response data length:', response.data?.length);
+    
+    if (response.success && Array.isArray(response.data)) {
+      setUsers(response.data);
+      console.log('✅ Users set to state:', response.data.length, 'users');
       
-      // Mock data tạm thời
-      const mockUsers = [
-        { _id: '1', fullName: 'Nguyễn Văn A', email: 'a@example.com', avatar: null },
-        { _id: '2', fullName: 'Trần Thị B', email: 'b@example.com', avatar: null },
-        { _id: currentUser?.id, fullName: currentUser?.fullName, email: currentUser?.email, avatar: currentUser?.avatar }
-      ].filter(Boolean);
-      setUsers(mockUsers);
-    } catch (error) {
-      console.error('Error loading users:', error);
+      // Log first user để xem cấu trúc
+      if (response.data.length > 0) {
+        console.log('First user structure:', response.data[0]);
+        console.log('Keys of first user:', Object.keys(response.data[0]));
+      }
+    } else {
+      console.error('❌ Invalid users response:', response);
+      setUsers([]);
     }
-  };
+  } catch (error) {
+    console.error('❌ Error loading users:', error);
+    setUsers([]);
+  }
+};
 
   const loadProjects = async () => {
     setLoading(true);
     try {
+      console.log('=== LOADING PROJECTS ===');
+      const currentUserId = getUserId();
+      console.log('Current User ID:', currentUserId);
+      
       const params = {
         page: pagination.current,
         limit: pagination.pageSize,
@@ -110,17 +144,30 @@ const ProjectsContent = () => {
         priority: filterPriority !== 'all' ? filterPriority : undefined,
       };
 
+      console.log('API Params:', params);
+
       const response = await projectService.getProjects(params);
       
-      setProjects(response.data || []);
-      setFilteredProjects(response.data || []);
-      setPagination({
-        ...pagination,
-        total: response.pagination?.total || response.data?.length || 0,
-      });
+      console.log('=== PROJECTS API RESPONSE ===');
+      console.log('Data length:', response.data?.length);
+      
+      if (response.data && Array.isArray(response.data)) {
+        setProjects(response.data || []);
+        setFilteredProjects(response.data || []);
+        setPagination({
+          ...pagination,
+          total: response.pagination?.total || response.data?.length || 0,
+        });
+      } else {
+        console.error('Invalid response data:', response);
+        setProjects([]);
+        setFilteredProjects([]);
+      }
     } catch (error) {
       console.error('Error loading projects:', error);
-      message.error(error.message || 'Không thể tải danh sách dự án');
+      message.error('Không thể tải danh sách dự án');
+      setProjects([]);
+      setFilteredProjects([]);
     } finally {
       setLoading(false);
     }
@@ -137,7 +184,6 @@ const ProjectsContent = () => {
   const filterProjects = () => {
     let filtered = projects;
 
-    // Filter by search text
     if (searchText) {
       filtered = filtered.filter(project =>
         project.title?.toLowerCase().includes(searchText.toLowerCase()) ||
@@ -145,17 +191,14 @@ const ProjectsContent = () => {
       );
     }
 
-    // Filter by status
     if (filterStatus !== 'all') {
       filtered = filtered.filter(project => project.status === filterStatus);
     }
 
-    // Filter by priority
     if (filterPriority !== 'all') {
       filtered = filtered.filter(project => project.priority === filterPriority);
     }
 
-    // Filter by active tab
     if (activeTab !== 'all') {
       filtered = filtered.filter(project => project.status === activeTab);
     }
@@ -163,41 +206,91 @@ const ProjectsContent = () => {
     setFilteredProjects(filtered);
   };
 
+  // 🎯 QUAN TRỌNG: Sửa hàm handleFormFinish
   const handleFormFinish = async (formData) => {
     try {
       setLoading(true);
-      // Nếu đang tạo dự án mới, set người tạo là người phụ trách
-      if (!editingProject) {
-        formData.assignee_id = currentUser.id;
-        formData.createdBy = currentUser.id;
-      }
       
-      // Gọi API tạo/cập nhật dự án
       let response;
+      const currentUserId = getUserId();
+      
       if (editingProject) {
+        console.log('=== DEBUG UPDATE PROJECT ===');
+        console.log('Project ID to update:', editingProject._id);
+        console.log('Current User ID:', currentUserId);
+        
+        // Log form data
+        console.log('FormData to update:');
+        const formDataObj = {};
+        for (let [key, value] of formData.entries()) {
+          formDataObj[key] = value;
+          console.log(`  ${key}:`, value);
+        }
+        
+        // Thêm createdBy vào formData
+        // formData.append('createdBy', currentUserId);
+        
+        // Gọi service update
         response = await projectService.updateProject(editingProject._id, formData);
+        
+        console.log('Update API response:', response);
+        console.log('Response success?', response.success);
+        console.log('Response code?', response.code);
+        console.log('Response message?', response.message);
+        
+        // 🎯 QUAN TRỌNG: Kiểm tra CẢ success VÀ code
+        if (response.success && response.code === 200) {
+          console.log('✅ Update successful!');
+          message.success(response.message || 'Cập nhật thành công!');
+          setModalVisible(false);
+          setEditingProject(null);
+          
+          // Reload projects sau 300ms
+          setTimeout(() => {
+            loadProjects();
+          }, 300);
+          
+        } else {
+          // Xử lý lỗi dựa trên code
+          console.error('❌ Update failed:', response);
+          
+          if (response.code === 404) {
+            message.error('Không tìm thấy dự án. Có thể đã bị xóa hoặc không tồn tại.');
+          } else if (response.code === 403) {
+            message.error('Bạn không có quyền chỉnh sửa dự án này.');
+          } else if (response.code === 400) {
+            message.error('Dữ liệu không hợp lệ: ' + (response.message || ''));
+          } else {
+            message.error(response.message || `Cập nhật thất bại (code: ${response.code})`);
+          }
+        }
       } else {
-        response = await projectService.createProject(formData);
+        // Khi tạo mới
+        formData.append('createdBy', currentUserId);
+        response = await projectService.createProject(formData, false);
+        
+        if (response.success) {
+          message.success(response.message || 'Tạo dự án thành công!');
+          setModalVisible(false);
+          loadProjects();
+        } else {
+          message.error(response.message || 'Tạo dự án thất bại!');
+        }
       }
       
-      if (response.success) {
-        message.success(response.message || 'Thao tác thành công!');
-        setModalVisible(false);
-        setEditingProject(null);
-        loadProjects();
-      } else {
-        message.error(response.message || 'Thao tác thất bại!');
-      }
     } catch (error) {
-      console.error('Error:', error);
+      console.error('❌ Error in handleFormFinish:', error);
       message.error(error.message || 'Thao tác thất bại!');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeleteProject = async (projectId) => {
-    Modal.confirm({
+const handleDeleteProject = async (projectId) => {
+    console.log('=== HANDLE DELETE PROJECT CALLED ===');
+    
+    // Sử dụng modal từ useApp hook
+    modal.confirm({
       title: 'Xác nhận xóa',
       content: 'Bạn có chắc chắn muốn xóa dự án này?',
       okText: 'Xóa',
@@ -205,7 +298,10 @@ const ProjectsContent = () => {
       okType: 'danger',
       async onOk() {
         try {
+          console.log('Modal onOk called');
           const response = await projectService.deleteProject(projectId);
+          
+          console.log('Delete response:', response);
           
           if (response.success) {
             message.success(response.message || 'Xóa dự án thành công!');
@@ -217,6 +313,9 @@ const ProjectsContent = () => {
           console.error('Error deleting project:', error);
           message.error(error.message || 'Xóa dự án thất bại!');
         }
+      },
+      onCancel() {
+        console.log('Delete cancelled by user');
       }
     });
   };
@@ -246,7 +345,8 @@ const ProjectsContent = () => {
   const navigate = useNavigate();
 
   const handleViewProject = (project) => {
-    navigate(`/projects/detail/${project._id}`);
+    const projectId = project._id || project.id;
+    navigate(`/projects/detail/${projectId}`);
   };
 
   const handleEditProject = (project) => {
@@ -277,15 +377,13 @@ const ProjectsContent = () => {
     onChange: setSelectedRowKeys,
   };
 
-  // Kiểm tra quyền sửa/xóa dự án
   const canEditProject = (project) => {
     if (!currentUser || !project) return false;
     
-    // 1. Người tạo dự án có quyền (và cũng là người phụ trách)
-    if (project.createdBy === currentUser.id) return true;
+    const currentUserId = getUserId();
     
-    // 3. Manager có quyền sửa tất cả
-    if (isManager) return true;
+    if (project.createdBy === currentUserId) return true;
+    if (isManager()) return true;
     
     return false;
   };
@@ -293,8 +391,8 @@ const ProjectsContent = () => {
   const canDeleteProject = (project) => {
     if (!currentUser || !project) return false;
     
-    // Chỉ người tạo dự án hoặc Manager mới được xóa
-    return project.createdBy === currentUser.id || isManager;
+    const currentUserId = getUserId();
+    return project.createdBy === currentUserId || isManager();
   };
 
   const columns = [
@@ -350,13 +448,14 @@ const ProjectsContent = () => {
       title: 'Vai trò',
       key: 'role',
       render: (_, record) => {
+        const currentUserId = getUserId();
         let roleText = '';
         let roleColor = 'default';
         
-        if (record.createdBy === currentUser?.id) {
+        if (record.createdBy === currentUserId) {
           roleText = 'Phụ trách';
           roleColor = 'gold';
-        } else if (record.listUser?.includes(currentUser?.id)) {
+        } else if (record.listUser?.includes(currentUserId)) {
           roleText = 'Thành viên';
           roleColor = 'green';
         }
@@ -394,34 +493,32 @@ const ProjectsContent = () => {
     },
   ];
 
+  const currentUserId = getUserId();
   const stats = {
     total: pagination.total,
     completed: projects.filter(p => p.status === 'completed').length,
     inProgress: projects.filter(p => p.status === 'in-progress').length,
     notStarted: projects.filter(p => p.status === 'not-started').length,
-    // Manager phụ trách các dự án mình tạo
-    assignedToMe: projects.filter(p => p.createdBy === currentUser?.id).length,
+    assignedToMe: projects.filter(p => p.createdBy === currentUserId).length,
   };
 
   return (
     <div>
-      {/* Header */}
       <Card style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <Title level={2} style={{ margin: 0 }}>
               <ProjectOutlined style={{ marginRight: 12, color: '#1890ff' }} />
-              {isManager ? 'Quản Lý Dự Án' : 'Dự Án Của Tôi'}
+              {isManager() ? 'Quản Lý Dự Án' : 'Dự Án Của Tôi'}
             </Title>
             <p style={{ margin: 0, color: '#666' }}>
-              {isManager 
+              {isManager() 
                 ? 'Quản lý và theo dõi tiến độ tất cả dự án' 
                 : 'Các dự án bạn đang tham gia và phụ trách'}
             </p>
           </div>
 
-          {/* Chỉ Manager mới có quyền tạo dự án mới */}
-          {isManager && (
+          {isManager() && (
             <Button
               type="primary"
               icon={<PlusOutlined />}
@@ -433,7 +530,6 @@ const ProjectsContent = () => {
         </div>
       </Card>
 
-      {/* Statistics */}
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={12} sm={6}>
           <Card>
@@ -467,7 +563,7 @@ const ProjectsContent = () => {
         <Col xs={12} sm={6}>
           <Card>
             <Statistic
-              title={isManager ? "Bạn phụ trách" : "Bạn phụ trách"}
+              title={isManager() ? "Bạn phụ trách" : "Bạn phụ trách"}
               value={stats.assignedToMe}
               valueStyle={{ color: '#722ed1' }}
               prefix={<UserOutlined />}
@@ -476,7 +572,6 @@ const ProjectsContent = () => {
         </Col>
       </Row>
 
-      {/* Filters and Tabs */}
       <Card style={{ marginBottom: 16 }}>
         <Tabs
           activeKey={activeTab}
@@ -564,8 +659,7 @@ const ProjectsContent = () => {
           </Col>
         </Row>
 
-        {/* Bulk Actions - Chỉ Manager mới có quyền */}
-        {isManager && selectedRowKeys.length > 0 && (
+        {isManager() && selectedRowKeys.length > 0 && (
           <Row style={{ marginTop: 16 }}>
             <Col span={24}>
               <Space>
@@ -602,7 +696,6 @@ const ProjectsContent = () => {
         )}
       </Card>
 
-      {/* Projects Display */}
       {viewMode === 'grid' ? (
         filteredProjects.length === 0 ? (
           <Card>
@@ -631,11 +724,12 @@ const ProjectsContent = () => {
                     thumbnail: project.thumbnail,
                     startDate: project.timeStart,
                     dueDate: project.timeFinish,
-                    assignee_id: project.createdBy, // assignee_id = createdBy
+                    assignee_id: project.createdBy,
                     createdBy: project.createdBy,
                     listUser: project.listUser || [],
                   }}
                   currentUser={currentUser}
+                  currentUserId={currentUserId}
                   onView={handleViewProject}
                   onEdit={canEditProject(project) ? handleEditProject : undefined}
                   onDelete={canDeleteProject(project) ? handleDeleteProject : undefined}
@@ -647,7 +741,7 @@ const ProjectsContent = () => {
       ) : (
         <Card>
           <Table
-            rowSelection={isManager ? rowSelection : undefined} // Chỉ Manager mới được chọn nhiều
+            rowSelection={isManager() ? rowSelection : undefined}
             columns={columns}
             dataSource={filteredProjects}
             rowKey="_id"
@@ -658,8 +752,7 @@ const ProjectsContent = () => {
         </Card>
       )}
 
-      {/* Project Form Modal - Chỉ Manager mới tạo dự án mới */}
-      {isManager && (
+      {isManager() && (
         <Modal
           title={editingProject ? 'Chỉnh sửa dự án' : 'Tạo dự án mới'}
           open={modalVisible}
@@ -676,8 +769,10 @@ const ProjectsContent = () => {
             loading={loading}
             users={users}
             currentUser={currentUser}
-            isParentProject={true} // Đây là dự án cha do Manager tạo
+            currentUserId={currentUserId}
+            isParentProject={true}
             autoAssignToCreator={!editingProject}
+            isCreatingTask={false}
           />
         </Modal>
       )}

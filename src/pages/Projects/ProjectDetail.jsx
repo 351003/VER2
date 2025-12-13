@@ -46,7 +46,7 @@ import moment from 'moment';
 import { useAuth } from '../../contexts/AuthContext';
 import projectService from '../../services/projectService';
 import ProjectForm from '../../components/Projects/ProjectForm';
-
+import userService from '../../services/userService';
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
 const { TextArea } = Input;
@@ -70,7 +70,11 @@ const ProjectDetailContent = () => {
   const [users, setUsers] = useState([]);
   const [projectUsers, setProjectUsers] = useState([]); // Thành viên trong dự án này
 
+  console.log('=== DEBUG PROJECT DETAIL ===');
+  console.log('Project ID from URL:', id);
+  console.log('Full URL:', window.location.href);
   useEffect(() => {
+    console.log('useEffect triggered, loading project:', id);
     if (id) {
       loadProjectDetail();
     }
@@ -84,58 +88,108 @@ const ProjectDetailContent = () => {
 
   // Load danh sách user từ project
   const loadProjectUsers = async () => {
-    try {
-      // Mock data - trong thực tế sẽ lấy từ API
-      const mockUsers = [
-        { _id: '1', fullName: 'Nguyễn Văn A', email: 'a@example.com', avatar: null },
-        { _id: '2', fullName: 'Trần Thị B', email: 'b@example.com', avatar: null },
-        { _id: '3', fullName: 'Lê Văn C', email: 'c@example.com', avatar: null },
-        { _id: '4', fullName: 'Phạm Thị D', email: 'd@example.com', avatar: null },
-        { _id: user?.id, fullName: user?.fullName, email: user?.email, avatar: user?.avatar }
-      ].filter(Boolean);
-
-      // Lọc chỉ lấy users có trong dự án
-      const projectMemberIds = [];
-      
-      // Thêm người tạo (cũng là người phụ trách)
-      if (project.createdBy) {
-        projectMemberIds.push(project.createdBy);
-      }
-      
-      // Thêm thành viên từ listUser
-      if (project.listUser && Array.isArray(project.listUser)) {
-        project.listUser.forEach(member => {
-          const memberId = typeof member === 'object' ? member._id : member;
-          if (memberId && !projectMemberIds.includes(memberId)) {
-            projectMemberIds.push(memberId);
-          }
-        });
-      }
-      
-      // Lọc users
-      const filteredUsers = mockUsers.filter(userItem => 
-        projectMemberIds.includes(userItem._id)
-      );
-      
-      setProjectUsers(filteredUsers);
-      setUsers(filteredUsers); // Cũng set cho users để dùng trong form
-    } catch (error) {
-      console.error('Error loading project users:', error);
+  try {
+    console.log('=== Loading Project Users ===');
+    
+    // 1. Lấy tất cả users từ API
+    const allUsersResponse = await userService.getUsers();
+    
+    console.log('All users API response:', allUsersResponse);
+    
+    if (!allUsersResponse.success || !Array.isArray(allUsersResponse.data)) {
+      console.error('❌ Cannot get users from API or data is not array');
+      setProjectUsers([]);
+      setUsers([]);
+      return;
     }
-  };
+    
+    const allUsers = allUsersResponse.data;
+    console.log('✅ All users from API:', allUsers.length);
+    
+    // Debug: show all users
+    allUsers.forEach((user, index) => {
+      console.log(`User ${index}:`, { 
+        id: user._id, 
+        name: user.fullName, 
+        email: user.email 
+      });
+    });
+    
+    // 2. Lọc chỉ lấy users có trong dự án
+    const projectMemberIds = [];
+    
+    // Thêm người tạo (cũng là người phụ trách)
+    if (project.createdBy) {
+      projectMemberIds.push(project.createdBy);
+      console.log('Project creator ID:', project.createdBy);
+    }
+    
+    // Thêm thành viên từ listUser
+    if (project.listUser && Array.isArray(project.listUser)) {
+      console.log('Project listUser:', project.listUser);
+      project.listUser.forEach(member => {
+        const memberId = typeof member === 'object' ? member._id : member;
+        if (memberId && !projectMemberIds.includes(memberId)) {
+          projectMemberIds.push(memberId);
+        }
+      });
+    }
+    
+    console.log('Project member IDs:', projectMemberIds);
+    
+    // 3. Lọc users thực tế
+    const filteredUsers = allUsers.filter(userItem => 
+      projectMemberIds.includes(userItem._id)
+    );
+    
+    // 4. Đảm bảo người tạo luôn có trong danh sách (nếu chưa có)
+    if (project.createdBy) {
+      const creator = allUsers.find(u => u._id === project.createdBy);
+      if (creator && !filteredUsers.some(u => u._id === creator._id)) {
+        filteredUsers.push(creator);
+        console.log('Added creator to filtered users:', creator.fullName);
+      }
+    }
+    
+    console.log('✅ Filtered project users:', filteredUsers.length, 'users');
+    filteredUsers.forEach((user, index) => {
+      console.log(`Project User ${index}:`, user.fullName, user.email);
+    });
+    
+    setProjectUsers(filteredUsers);
+    setUsers(allUsers); // Lưu tất cả users để dùng trong form
+    
+  } catch (error) {
+    console.error('❌ Error loading project users:', error);
+    setProjectUsers([]);
+    setUsers([]);
+  }
+};
 
   const loadProjectDetail = async () => {
+    console.log('Loading project detail for ID:', id);
     setLoading(true);
     try {
       const response = await projectService.getProjectDetail(id);
       
+      console.log('Project detail API response:', response);
+      
       if (!response.success) {
+        console.error('API returned error:', response);
         message.error('Không thể tải chi tiết dự án');
         navigate('/projects');
         return;
       }
-      
       const projectData = response.data;
+      console.log('Project data:', projectData);
+      
+      if (!projectData) {
+        console.error('No project data found');
+        message.error('Dự án không tồn tại');
+        navigate('/projects');
+        return;
+      }
+      
       setProject(projectData);
       setComments(response.comments || []);
       
@@ -144,16 +198,26 @@ const ProjectDetailContent = () => {
         parentId: id,
         limit: 100
       });
-      
-      setSubProjects(subProjectsResponse.data || []);
-    } catch (error) {
-      console.error('Error loading project detail:', error);
-      message.error('Không thể tải chi tiết dự án');
-      navigate('/projects');
-    } finally {
-      setLoading(false);
-    }
-  };
+      console.log('Sub-projects response:', subProjectsResponse);
+      // QUAN TRỌNG: Filter để loại bỏ parent project
+    const rawSubProjects = subProjectsResponse.data || [];
+    const actualSubProjects = rawSubProjects.filter(subProject => {
+      // Chỉ lấy những project có:
+      // 1. projectParentId khớp với id của dự án cha
+      // 2. KHÔNG phải chính dự án cha (theo _id)
+      return subProject.projectParentId === id && subProject._id !== id;
+    });
+    
+    console.log(`Filtered sub-projects: ${rawSubProjects.length} → ${actualSubProjects.length}`);
+    setSubProjects(actualSubProjects);
+  } catch (error) {
+    console.error('Error loading project detail:', error);
+    message.error('Không thể tải chi tiết dự án');
+    navigate('/projects');
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Kiểm tra user có thể tạo công việc không
   const canCreateSubProject = () => {
@@ -188,29 +252,31 @@ const ProjectDetailContent = () => {
   };
 
   // Tạo công việc (sub-project)
-  const handleCreateSubProject = async (formData) => {
-    try {
-      setLoading(true);
-      
-      // Thêm projectParentId vào formData
-      formData.append('projectParentId', id);
-      
-      const response = await projectService.createProject(formData);
-      
-      if (response.success) {
-        message.success('Tạo công việc thành công!');
-        setSubProjectModalVisible(false);
-        loadProjectDetail();
-      } else {
-        message.error(response.message || 'Tạo công việc thất bại!');
-      }
-    } catch (error) {
-      console.error('Error creating sub-project:', error);
-      message.error(error.message || 'Tạo công việc thất bại!');
-    } finally {
-      setLoading(false);
+  // ProjectDetail.jsx - trong hàm handleCreateSubProject
+const handleCreateSubProject = async (formData) => {
+  try {
+    setLoading(true);
+    
+    // Thêm projectParentId vào formData
+    formData.append('projectParentId', id);
+    
+    // QUAN TRỌNG: Tạo dự án con (công việc) -> isSubProject = true
+    const response = await projectService.createProject(formData, true);
+    
+    if (response.success) {
+      message.success('Tạo công việc thành công!');
+      setSubProjectModalVisible(false);
+      loadProjectDetail();
+    } else {
+      message.error(response.message || 'Tạo công việc thất bại!');
     }
-  };
+  } catch (error) {
+    console.error('Error creating sub-project:', error);
+    message.error(error.message || 'Tạo công việc thất bại!');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleDeleteSubProject = async (subProjectId) => {
     Modal.confirm({
@@ -991,6 +1057,9 @@ const ProjectDetailContent = () => {
           users={projectUsers} // Chỉ cho chọn thành viên trong dự án
           currentUser={user}
           isParentProject={false} // Đây là sub-project (công việc)
+          autoAssignToCreator={true} // Không tự động assign người tạo là phụ trách
+          isCreatingTask={true} // THÊM: Đây là form tạo công việc
+          parentProjectId={id} // THÊM: ID dự án cha
         />
       </Modal>
     </div>
@@ -1005,4 +1074,4 @@ const ProjectDetail = () => {
   );
 };
 
-export default ProjectDetail;
+export default ProjectDetail; 

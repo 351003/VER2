@@ -19,14 +19,14 @@ const PROJECT_ENDPOINTS = {
   UPLOAD: '/upload'
 };
 
-// Helper để xác định API client dựa trên role của user - FIXED (case insensitive)
+// Helper để xác định API client dựa trên role của user
 const getApiClientByRole = () => {
   const userStr = localStorage.getItem('user');
   if (!userStr) return apiClientV1;
   
   try {
     const user = JSON.parse(userStr);
-    const userRole = user.role?.toUpperCase(); // CHUYỂN THÀNH CHỮ HOA
+    const userRole = user.role?.toUpperCase();
     return userRole === 'MANAGER' ? apiClientV3 : apiClientV1;
   } catch (error) {
     console.error('Error parsing user data:', error);
@@ -34,26 +34,9 @@ const getApiClientByRole = () => {
   }
 };
 
-// Helper để lấy API base URL dựa trên role - FIXED (case insensitive)
-const getApiBaseUrlByRole = () => {
-  const userStr = localStorage.getItem('user');
-  if (!userStr) return `${API_CONFIG.BASE_URL}/api/v1`;
-  
-  try {
-    const user = JSON.parse(userStr);
-    const userRole = user.role?.toUpperCase(); // CHUYỂN THÀNH CHỮ HOA
-    return userRole === 'MANAGER' 
-      ? `${API_CONFIG.BASE_URL}/api/v3` 
-      : `${API_CONFIG.BASE_URL}/api/v1`;
-  } catch (error) {
-    console.error('Error parsing user data:', error);
-    return `${API_CONFIG.BASE_URL}/api/v1`;
-  }
-};
-
 // ========== XỬ LÝ COMMENT ==========
 
-// Thêm comment - Dùng POST /api/v1/projects/comment/:id
+// Thêm comment
 export const addComment = async (projectId, comment) => {
   try {
     const response = await apiClientV1.post(`${PROJECT_ENDPOINTS.COMMENT.ADD}/${projectId}`, { 
@@ -77,7 +60,7 @@ export const addComment = async (projectId, comment) => {
   }
 };
 
-// Sửa comment - Dùng PATCH /api/v1/projects/comment/edit/:id
+// Sửa comment
 export const editComment = async (commentId, comment) => {
   try {
     const response = await apiClientV1.patch(
@@ -102,7 +85,7 @@ export const editComment = async (commentId, comment) => {
   }
 };
 
-// Xóa comment - Dùng PATCH /api/v1/projects/comment/delete/:id (soft delete)
+// Xóa comment
 export const deleteComment = async (commentId) => {
   try {
     const response = await apiClientV1.patch(
@@ -157,31 +140,60 @@ export const uploadFile = async (file) => {
   }
 };
 
-// Lấy danh sách dự án - Backend đã tự lọc theo user
+// Lấy danh sách dự án
 export const getProjects = async (params = {}) => {
   try {
     const apiClient = getApiClientByRole();
     const response = await apiClient.get(PROJECT_ENDPOINTS.LIST, { params });
     
+    if (!response) {
+      console.error('❌ ERROR: Empty response from getProjects');
+      return {
+        success: false,
+        data: [],
+        pagination: {
+          page: params.page || 1,
+          pageSize: params.limit || 10,
+          total: 0
+        }
+      };
+    }
+    
+    const data = response.data || response;
+    const paginationData = response.pagination || {
+      page: params.page || 1,
+      pageSize: params.limit || 10,
+      total: Array.isArray(data) ? data.length : 0
+    };
+    
     return {
       success: true,
-      data: response || [],
-      pagination: {
-        page: params.page || 1,
-        pageSize: params.limit || 10,
-        total: response?.length || 0
-      }
+      data: Array.isArray(data) ? data : [],
+      pagination: paginationData
     };
   } catch (error) {
     console.error('Error fetching projects:', error);
-    throw error;
+    
+    return {
+      success: false,
+      data: [],
+      pagination: {
+        page: params.page || 1,
+        pageSize: params.limit || 10,
+        total: 0
+      }
+    };
   }
 };
 
 // Lấy chi tiết dự án
 export const getProjectDetail = async (id) => {
   try {
+    console.log('=== DEBUG GET PROJECT DETAIL ===');
+    console.log('Project ID:', id);
     const apiClient = getDetailApiClient();
+    
+    console.log('API Endpoint:', `${PROJECT_ENDPOINTS.DETAIL}/${id}`);
     const response = await apiClient.get(`${PROJECT_ENDPOINTS.DETAIL}/${id}`);
     
     return {
@@ -190,64 +202,67 @@ export const getProjectDetail = async (id) => {
       comments: response?.comment || []
     };
   } catch (error) {
+    console.error('=== ERROR GETTING PROJECT DETAIL ===');
     console.error('Error fetching project detail:', error);
     throw error;
   }
 };
 
-// Tạo dự án mới - FIXED VERSION (case insensitive)
-export const createProject = async (formData) => {
+// Tạo dự án mới
+export const createProject = async (formData, isSubProject = false) => {
   try {
     console.log('=== DEBUG CREATE PROJECT ===');
     
     const isFormData = formData instanceof FormData;
     console.log('Is FormData:', isFormData);
     
-    // Xác định xem dùng route nào
     const userStr = localStorage.getItem('user');
     console.log('User from localStorage:', userStr);
     
     let apiBaseUrl;
     let apiClient;
+    let endpoint;
     
     if (userStr) {
       const user = JSON.parse(userStr);
       console.log('User role:', user.role);
       
-      // CHUYỂN ROLE THÀNH CHỮ HOA ĐỂ SO SÁNH
       const userRole = user.role?.toUpperCase();
       console.log('User role uppercase:', userRole);
       
-      // Manager tạo dự án cha dùng V3
-      // User tạo sub-project dùng V1
-      if (userRole === 'MANAGER') {
-        apiBaseUrl = `${API_CONFIG.BASE_URL}/api/v3`;
-        apiClient = apiClientV3;
-        console.log('✓ MANAGER detected, using API v3');
-      } else {
+      if (isSubProject) {
         apiBaseUrl = `${API_CONFIG.BASE_URL}/api/v1`;
         apiClient = apiClientV1;
-        console.log('✓ USER detected, using API v1');
+        endpoint = PROJECT_ENDPOINTS.CREATE;
+        console.log('✓ Creating SUB-PROJECT, using API v1');
+      } else {
+        if (userRole === 'MANAGER') {
+          apiBaseUrl = `${API_CONFIG.BASE_URL}/api/v3`;
+          apiClient = apiClientV3;
+          endpoint = PROJECT_ENDPOINTS.CREATE;
+          console.log('✓ MANAGER creating PARENT PROJECT, using API v3');
+        } else {
+          apiBaseUrl = `${API_CONFIG.BASE_URL}/api/v1`;
+          apiClient = apiClientV1;
+          endpoint = PROJECT_ENDPOINTS.CREATE;
+          console.log('⚠ USER should not create parent project, using API v1');
+        }
       }
     } else {
       apiBaseUrl = `${API_CONFIG.BASE_URL}/api/v1`;
       apiClient = apiClientV1;
+      endpoint = PROJECT_ENDPOINTS.CREATE;
       console.log('⚠ No user found, using default API v1');
     }
     
     console.log('API Base URL:', apiBaseUrl);
-    console.log('API Client:', apiClient === apiClientV3 ? 'V3' : 'V1');
+    console.log('API Endpoint:', endpoint);
     
     let response;
     
     if (isFormData) {
-      // Xử lý FormData (Manager tạo dự án với upload file)
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      console.log('Token exists:', !!token);
-      
-      // DÙNG apiBaseUrl TRỰC TIẾP
-      const apiUrl = `${apiBaseUrl}${PROJECT_ENDPOINTS.CREATE}`;
-      console.log('Final API URL:', apiUrl);
+      const apiUrl = `${apiBaseUrl}${endpoint}`;
       
       response = await fetch(apiUrl, {
         method: 'POST',
@@ -258,7 +273,6 @@ export const createProject = async (formData) => {
       });
       
       console.log('Fetch response status:', response.status);
-      console.log('Fetch response ok:', response.ok);
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -267,12 +281,9 @@ export const createProject = async (formData) => {
       }
       
       response = await response.json();
-      console.log('Fetch response JSON:', response);
     } else {
-      // Xử lý JSON data (User tạo sub-project) - dùng axios client
       console.log('JSON data:', formData);
-      response = await apiClient.post(PROJECT_ENDPOINTS.CREATE, formData);
-      console.log('Axios response:', response);
+      response = await apiClient.post(endpoint, formData);
     }
     
     console.log('=== CREATE PROJECT SUCCESS ===');
@@ -284,7 +295,6 @@ export const createProject = async (formData) => {
   } catch (error) {
     console.error('=== ERROR IN CREATE PROJECT ===');
     console.error('Error creating project:', error);
-    console.error('Error stack:', error.stack);
     
     let errorMessage = 'Tạo dự án thất bại!';
     if (error.message.includes('401')) {
@@ -299,105 +309,165 @@ export const createProject = async (formData) => {
   }
 };
 
-// Cập nhật dự án - FIXED VERSION (case insensitive)
+// 🎯 QUAN TRỌNG: Sửa hàm updateProject để xử lý response đúng
 export const updateProject = async (id, formData) => {
   try {
-    console.log('=== DEBUG UPDATE PROJECT ===');
-    console.log('Updating project ID:', id);
+    console.log('=== UPDATE PROJECT SERVICE ===');
+    console.log('Project ID:', id);
     
     const isFormData = formData instanceof FormData;
     console.log('Is FormData:', isFormData);
     
-    // Xác định xem dùng route nào
+    // Xác định API URL dựa trên user role
     const userStr = localStorage.getItem('user');
-    let apiBaseUrl;
-    let apiClient;
+    let apiBaseUrl = `${API_CONFIG.BASE_URL}/api/v1`;
     
     if (userStr) {
       const user = JSON.parse(userStr);
-      console.log('User role:', user.role);
-      
-      // CHUYỂN ROLE THÀNH CHỮ HOA ĐỂ SO SÁNH
       const userRole = user.role?.toUpperCase();
-      console.log('User role uppercase:', userRole);
-      
       if (userRole === 'MANAGER') {
         apiBaseUrl = `${API_CONFIG.BASE_URL}/api/v3`;
-        apiClient = apiClientV3;
-        console.log('✓ MANAGER detected, using API v3');
+        console.log('✓ Using API v3 for Manager');
       } else {
-        apiBaseUrl = `${API_CONFIG.BASE_URL}/api/v1`;
-        apiClient = apiClientV1;
-        console.log('✓ USER detected, using API v1');
+        console.log('✓ Using API v1 for User');
       }
-    } else {
-      apiBaseUrl = `${API_CONFIG.BASE_URL}/api/v1`;
-      apiClient = apiClientV1;
-      console.log('⚠ No user found, using default API v1');
     }
     
-    console.log('API Base URL:', apiBaseUrl);
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    const url = `${apiBaseUrl}${PROJECT_ENDPOINTS.EDIT}/${id}`;
     
-    let response;
+    console.log('PATCH URL:', url);
     
-    if (isFormData) {
-      // Xử lý FormData
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      const url = `${apiBaseUrl}${PROJECT_ENDPOINTS.EDIT}/${id}`;
-      
-      console.log('PATCH URL:', url);
-      
-      response = await fetch(url, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        body: formData
-      });
-      
-      console.log('Fetch response status:', response.status);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Fetch error response:', errorText);
-        throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
-      }
-      
-      response = await response.json();
-    } else {
-      // Xử lý JSON data
-      console.log('JSON update data:', formData);
-      response = await apiClient.patch(`${PROJECT_ENDPOINTS.EDIT}/${id}`, formData);
-      console.log('Axios response:', response);
+    // Gửi request
+    const response = await fetch(url, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData
+    });
+    
+    console.log('Response status:', response.status);
+    
+    // Đọc response text
+    const responseText = await response.text();
+    console.log('Raw response:', responseText);
+    
+    let responseData;
+    try {
+      responseData = JSON.parse(responseText);
+      console.log('Parsed response:', responseData);
+    } catch (e) {
+      console.error('Failed to parse JSON:', e);
+      return {
+        success: false,
+        code: 500,
+        message: 'Invalid JSON response from server',
+        data: null
+      };
     }
     
-    console.log('=== UPDATE PROJECT SUCCESS ===');
+    // 🎯 QUAN TRỌNG: Kiểm tra code trong response body
+    // Backend trả về: {code: 200, message: "success"} khi thành công
+    // Backend trả về: {code: 404, message: "dismiss"} khi thất bại
+    
+    const success = responseData.code === 200;
+    
     return {
-      success: response?.code === 200 || response?.success === true,
-      message: response?.message || 'Cập nhật thành công',
-      data: response?.data || response
+      success: success,
+      code: responseData.code || response.status,
+      message: responseData.message || (success ? 'Thành công' : 'Thất bại'),
+      data: responseData.data || responseData
     };
+    
   } catch (error) {
-    console.error('=== ERROR IN UPDATE PROJECT ===');
-    console.error('Error updating project:', error);
-    console.error('Error details:', error.message);
-    throw error;
+    console.error('=== UPDATE PROJECT ERROR ===');
+    console.error('Error:', error);
+    
+    return {
+      success: false,
+      code: 500,
+      message: error.message || 'Lỗi kết nối đến server',
+      data: null
+    };
   }
 };
 
 // Xóa dự án
+// Xóa dự án
 export const deleteProject = async (id) => {
   try {
-    const apiClient = getApiClientByRole();
-    const response = await apiClient.patch(`${PROJECT_ENDPOINTS.DELETE}/${id}`);
+    console.log('=== DEBUG DELETE PROJECT SERVICE ===');
+    console.log('Project ID:', id);
+    
+    // Lấy token
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    if (!token) {
+      throw new Error('Không tìm thấy token. Vui lòng đăng nhập lại.');
+    }
+    
+    // Xác định API URL dựa trên user role
+    const userStr = localStorage.getItem('user');
+    let apiBaseUrl = `${API_CONFIG.BASE_URL}/api/v1`;
+    
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      const userRole = user.role?.toUpperCase();
+      if (userRole === 'MANAGER') {
+        apiBaseUrl = `${API_CONFIG.BASE_URL}/api/v3`;
+        console.log('✓ Using API v3 for Manager delete');
+      } else {
+        console.log('✓ Using API v1 for User delete');
+      }
+    }
+    
+    const url = `${apiBaseUrl}${PROJECT_ENDPOINTS.DELETE}/${id}`;
+    console.log('Delete URL:', url);
+    
+    // Gửi request PATCH
+    const response = await fetch(url, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    console.log('Delete response status:', response.status);
+    
+    const responseText = await response.text();
+    console.log('Raw delete response:', responseText);
+    
+    let responseData;
+    try {
+      responseData = JSON.parse(responseText);
+    } catch (e) {
+      console.error('Failed to parse JSON:', e);
+      return {
+        success: false,
+        message: 'Invalid JSON response from server'
+      };
+    }
+    
+    // Kiểm tra response
+    const success = responseData.code === 200;
     
     return {
-      success: response?.code === 200 || response?.success === true,
-      message: response?.message || 'Xóa thành công'
+      success: success,
+      code: responseData.code || response.status,
+      message: responseData.message || (success ? 'Xóa thành công' : 'Xóa thất bại'),
+      data: responseData.data
     };
+    
   } catch (error) {
-    console.error('Error deleting project:', error);
-    throw error;
+    console.error('=== ERROR IN DELETE PROJECT ===');
+    console.error('Error:', error);
+    
+    return {
+      success: false,
+      code: 500,
+      message: error.message || 'Lỗi kết nối đến server'
+    };
   }
 };
 

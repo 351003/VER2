@@ -207,6 +207,8 @@ const ProjectCard = ({
             style={{ color: '#ff4d4f' }}
             onClick={(e) => {
               e.stopPropagation();
+              e.preventDefault();
+              console.log('Delete clicked for project:', project.id);
               if (onDelete) onDelete(project.id);
             }} 
           />

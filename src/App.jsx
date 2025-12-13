@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { ConfigProvider } from 'antd';
+import { ConfigProvider, Spin } from 'antd';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Layout from './components/Layout/Layout';
 import { NotificationProvider } from './contexts/NotificationContext';
@@ -22,9 +22,9 @@ import PersonalReports from './pages/Reports/PersonalReports';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import Profile from './pages/Profile/Profile';
 
-// ✅ Route bảo vệ
-const ProtectedRoute = ({ children, requiredRole }) => {
-  const { user, loading } = useAuth();
+// ✅ Route bảo vệ DUY NHẤT - SỬA LẠI
+const ProtectedRoute = ({ children, requireManager = false }) => {
+  const { user, loading, isManager } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -35,7 +35,7 @@ const ProtectedRoute = ({ children, requiredRole }) => {
         alignItems: 'center',
         height: '100vh'
       }}>
-        Loading...
+        <Spin size="large" />
       </div>
     );
   }
@@ -45,23 +45,13 @@ const ProtectedRoute = ({ children, requiredRole }) => {
     return <Navigate to="/login" replace />;
   }
 
-  // ✅ Nếu là admin mà đang không ở /admin → chuyển hướng
-  if (user.role === 'admin' && !location.pathname.startsWith('/admin')) {
-    return <Navigate to="/admin" replace />;
-  }
-
-  // ✅ Nếu không phải admin mà đang cố vào /admin → chặn
-  if (requiredRole === 'admin' && user.role !== 'admin') {
+  // ❌ Cần manager nhưng không phải manager
+  if (requireManager && !isManager()) {
     return <Navigate to="/dashboard" replace />;
   }
 
   return children;
 };
-
-// ✅ Route riêng cho admin
-const AdminRoute = ({ children }) => (
-  <ProtectedRoute requiredRole="admin">{children}</ProtectedRoute>
-);
 
 function App() {
   return (
@@ -100,7 +90,7 @@ function App() {
 
                 {/* Projects */}
                 <Route path="projects" element={<Projects />} />
-                <Route path="projects/:id" element={<ProjectDetail />} />
+                <Route path="projects/detail/:id" element={<ProjectDetail />} />
 
                 {/* Teams */}
                 <Route path="teams" element={<Teams />} />
@@ -109,17 +99,26 @@ function App() {
                 {/* Calendar */}
                 <Route path="calendar" element={<Calendar />} />
 
-                {/* Reports */}
-                <Route path="reports" element={<Reports />} />
+                {/* Reports - CHỈ MANAGER */}
+                <Route 
+                  path="reports" 
+                  element={
+                    <ProtectedRoute requireManager={true}>
+                      <Reports />
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                {/* Personal Reports - AI CŨNG XEM ĐƯỢC */}
                 <Route path="personalreports" element={<PersonalReports />} />
 
-                {/* ✅ Admin */}
+                {/* Admin - CHỈ MANAGER */}
                 <Route
                   path="admin"
                   element={
-                    <AdminRoute>
+                    <ProtectedRoute requireManager={true}>
                       <AdminDashboard />
-                    </AdminRoute>
+                    </ProtectedRoute>
                   }
                 />
               </Route>
