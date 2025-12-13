@@ -31,7 +31,8 @@ const ProjectCard = ({
   onView, 
   onEdit, 
   onDelete,
-  currentUser
+  currentUser,
+  users = []
 }) => {
   // Kiểm tra vai trò của user trong dự án này
   const getUserRole = () => {
@@ -218,22 +219,47 @@ const ProjectCard = ({
 
     return actions;
   };
+  // Lấy thông tin user từ ID
+  const getUserInfo = (userId) => {
+    if (!userId || !Array.isArray(users)) return null;
+    return users.find(user => user._id === userId || user.id === userId);
+  };
 
-  // Lấy danh sách team members để hiển thị
+  // Lấy danh sách team members để hiển thị - VERSION MỚI
   const getTeamMembers = () => {
     if (!project.listUser || !Array.isArray(project.listUser)) return [];
     
-    // Nếu listUser là mảng IDs
     return project.listUser
-      .filter(memberId => memberId !== project.createdBy) // Loại bỏ người tạo (đã là phụ trách)
+      .filter(memberId => memberId !== project.createdBy) // Loại bỏ người tạo
       .map(member => {
-        if (typeof member === 'object') {
+        // Trường hợp 1: member là object (có thông tin đầy đủ)
+        if (typeof member === 'object' && member !== null) {
           return {
-            id: member._id,
+            id: member._id || member.id,
             name: member.fullName || member.name,
             avatar: member.avatar
           };
         }
+        
+        // Trường hợp 2: member là ID string - tìm trong users prop
+        if (typeof member === 'string') {
+          const userInfo = getUserInfo(member);
+          if (userInfo) {
+            return {
+              id: member,
+              name: userInfo.fullName || userInfo.name || `User ${member.substring(0, 6)}...`,
+              avatar: userInfo.avatar
+            };
+          }
+          
+          // Không tìm thấy user trong danh sách
+          return {
+            id: member,
+            name: `User ${member.substring(0, 6)}...`,
+            avatar: null
+          };
+        }
+        
         return {
           id: member,
           name: `User ${member}`,
@@ -242,7 +268,29 @@ const ProjectCard = ({
       });
   };
 
+  // Lấy thông tin người tạo (phụ trách)
+  const getCreatorInfo = () => {
+    if (!project.createdBy) return null;
+    
+    const creator = getUserInfo(project.createdBy);
+    if (creator) {
+      return {
+        id: creator._id || creator.id,
+        name: creator.fullName || creator.name,
+        avatar: creator.avatar
+      };
+    }
+    
+    // Không tìm thấy
+    return {
+      id: project.createdBy,
+      name: `User ${project.createdBy.substring(0, 6)}...`,
+      avatar: null
+    };
+  };
+
   const teamMembers = getTeamMembers();
+  const creatorInfo = getCreatorInfo();
   const cardActions = getCardActions();
 
   return (
@@ -266,7 +314,7 @@ const ProjectCard = ({
       }}
       actions={cardActions}
     >
-      {/* Badge thumbnail */}
+      {/* Badge thumbnail
       {project.thumbnail && (
         <div 
           style={{
@@ -283,7 +331,7 @@ const ProjectCard = ({
             zIndex: 1
           }}
         />
-      )}
+      )} */}
 
       {/* Vai trò badge */}
       {getRoleBadge() && (
@@ -403,50 +451,57 @@ const ProjectCard = ({
         {teamMembers.length > 0 ? (
           <>
             <Avatar.Group 
-              size="small" 
-              maxCount={3} 
-              maxStyle={{ 
-                color: '#f56a00', 
-                backgroundColor: '#fde3cf',
-                fontSize: '10px'
-              }}
-            >
-              {/* Hiển thị người phụ trách đầu tiên */}
-              {project.createdBy && (
-                <Tooltip 
-                  key="assignee" 
-                  title="Phụ trách" 
-                  placement="top"
-                >
-                  <Avatar 
-                    size="small"
-                    icon={<CrownOutlined />}
-                    style={{ 
-                      backgroundColor: '#fadb14',
-                      border: '2px solid #fadb14'
-                    }}
-                  />
-                </Tooltip>
-              )}
-              
-              {/* Hiển thị các thành viên khác */}
-              {teamMembers.slice(0, 3).map((member) => (
-                <Tooltip 
-                  key={member.id} 
-                  title={member.name} 
-                  placement="top"
-                >
-                  <Avatar 
-                    src={member.avatar} 
-                    icon={<UserOutlined />}
-                    size="small"
-                    style={{ 
-                      backgroundColor: member.avatar ? 'transparent' : '#d9d9d9'
-                    }}
-                  />
-                </Tooltip>
-              ))}
-            </Avatar.Group>
+  size="small" 
+  maxCount={3} 
+  maxStyle={{ 
+    color: '#f56a00', 
+    backgroundColor: '#fde3cf',
+    fontSize: '10px'
+  }}
+>
+  {/* Hiển thị người phụ trách đầu tiên */}
+  {project.createdBy && creatorInfo && (
+    <Tooltip 
+      key="assignee" 
+      title={`Phụ trách: ${creatorInfo.name}`}
+      placement="top"
+    >
+      <Avatar 
+        size="small"
+        icon={creatorInfo.avatar ? null : <CrownOutlined />}
+        src={creatorInfo.avatar}
+        style={{ 
+          backgroundColor: creatorInfo.avatar ? 'transparent' : '#fadb14',
+          border: '2px solid #fadb14',
+          cursor: 'pointer'
+        }}
+      >
+        {!creatorInfo.avatar && creatorInfo.name?.charAt(0).toUpperCase()}
+      </Avatar>
+    </Tooltip>
+  )}
+  
+  {/* Hiển thị các thành viên khác */}
+  {teamMembers.slice(0, 3).map((member) => (
+    <Tooltip 
+      key={member.id} 
+      title={member.name} 
+      placement="top"
+    >
+      <Avatar 
+        src={member.avatar} 
+        icon={member.avatar ? null : <UserOutlined />}
+        size="small"
+        style={{ 
+          backgroundColor: member.avatar ? 'transparent' : '#d9d9d9',
+          cursor: 'pointer'
+        }}
+      >
+        {!member.avatar && member.name?.charAt(0).toUpperCase()}
+      </Avatar>
+    </Tooltip>
+  ))}
+</Avatar.Group>
             
             <span style={{ fontSize: '11px', color: '#999' }}>
               {teamMembers.length + 1} thành viên {/* +1 cho người phụ trách */}
@@ -462,7 +517,7 @@ const ProjectCard = ({
         )}
       </div>
 
-      {/* Footer với thông tin người tạo/phụ trách */}
+      {/* Footer với thông tin người tạo/phụ trách - SỬA */}
       <div style={{ 
         marginTop: 12, 
         paddingTop: 12, 
@@ -474,7 +529,7 @@ const ProjectCard = ({
         <Space size="small">
           <CrownOutlined style={{ color: '#fadb14', fontSize: '11px' }} />
           <span style={{ fontSize: '11px', color: '#666' }}>
-            Phụ trách: {project.createdBy?.fullName || 'Bạn'}
+            Phụ trách: {creatorInfo?.name || 'Bạn'}
           </span>
         </Space>
         

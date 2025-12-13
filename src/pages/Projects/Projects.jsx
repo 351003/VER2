@@ -716,20 +716,23 @@ const handleDeleteProject = async (projectId) => {
               >
                 <ProjectCard
                   project={{
+                    _id: project._id, // THÊM _id
                     id: project._id,
-                    name: project.title,
-                    description: project.content,
+                    // DÙNG CÙNG FIELD NAMES VỚI API
+                    title: project.title, // THAY name bằng title
+                    content: project.content, // THAY description bằng content
                     status: project.status,
                     priority: project.priority,
                     thumbnail: project.thumbnail,
-                    startDate: project.timeStart,
-                    dueDate: project.timeFinish,
-                    assignee_id: project.createdBy,
+                    timeStart: project.timeStart, // THAY startDate bằng timeStart
+                    timeFinish: project.timeFinish, // THAY dueDate bằng timeFinish
                     createdBy: project.createdBy,
                     listUser: project.listUser || [],
+                    createdAt: project.createdAt,
                   }}
                   currentUser={currentUser}
                   currentUserId={currentUserId}
+                  users = {users}
                   onView={handleViewProject}
                   onEdit={canEditProject(project) ? handleEditProject : undefined}
                   onDelete={canDeleteProject(project) ? handleDeleteProject : undefined}
