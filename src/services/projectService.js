@@ -208,108 +208,148 @@ export const getProjectDetail = async (id) => {
   }
 };
 
-// Tạo dự án mới
-export const createProject = async (formData, isSubProject = false) => {
+// ========== THÊM: Lấy tasks của một parent project ==========
+export const getTasksByParent = async (parentId, params = {}) => {
   try {
-    console.log('=== DEBUG CREATE PROJECT ===');
+    console.log('📋 SERVICE: Get tasks for parent:', parentId);
+    console.log('Params:', params);
     
-    const isFormData = formData instanceof FormData;
-    console.log('Is FormData:', isFormData);
-    
+    // Xác định API URL dựa trên user role
     const userStr = localStorage.getItem('user');
-    console.log('User from localStorage:', userStr);
-    
-    let apiBaseUrl;
-    let apiClient;
-    let endpoint;
+    let apiBaseUrl = `${API_CONFIG.BASE_URL}/api/v1`;
     
     if (userStr) {
       const user = JSON.parse(userStr);
-      console.log('User role:', user.role);
-      
       const userRole = user.role?.toUpperCase();
-      console.log('User role uppercase:', userRole);
+      if (userRole === 'MANAGER') {
+        apiBaseUrl = `${API_CONFIG.BASE_URL}/api/v3`;
+      }
+    }
+    
+    const url = `${apiBaseUrl}/projects/${parentId}/tasks`;
+    console.log('API URL:', url);
+    
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    const queryParams = new URLSearchParams(params).toString();
+    const fullUrl = queryParams ? `${url}?${queryParams}` : url;
+    
+    const response = await fetch(fullUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    console.log('Response status:', response.status);
+    
+    const responseData = await response.json();
+    console.log('Response data:', responseData);
+    
+    return {
+      success: responseData.code === 200,
+      code: responseData.code || response.status,
+      message: responseData.message || 'Thành công',
+      data: responseData.data || [],
+      total: responseData.total || 0
+    };
+    
+  } catch (error) {
+    console.error('🔥 ERROR in getTasksByParent:', error);
+    return {
+      success: false,
+      code: 500,
+      message: error.message || 'Lỗi khi tải danh sách công việc',
+      data: [],
+      total: 0
+    };
+  }
+};
+
+// Tạo dự án mới
+export const createProject = async (formData, isSubProject = false) => {
+  try {
+    console.log('🚀 === SERVICE: CREATE PROJECT ===');
+    console.log('Is SubProject/Task?', isSubProject);
+    
+    // Xác định API dựa trên user role VÀ loại project
+    const userStr = localStorage.getItem('user');
+    let apiBaseUrl;
+    
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      const userRole = user.role?.toUpperCase();
+      
+      console.log('User Role:', userRole);
+      console.log('Is SubProject:', isSubProject);
       
       if (isSubProject) {
+        // TASK: LUÔN dùng API v1 (cho cả Manager và User)
         apiBaseUrl = `${API_CONFIG.BASE_URL}/api/v1`;
-        apiClient = apiClientV1;
-        endpoint = PROJECT_ENDPOINTS.CREATE;
-        console.log('✓ Creating SUB-PROJECT, using API v1');
+        console.log('✅ TASK -> Using API v1');
       } else {
+        // PARENT PROJECT: Chỉ Manager dùng v3
         if (userRole === 'MANAGER') {
           apiBaseUrl = `${API_CONFIG.BASE_URL}/api/v3`;
-          apiClient = apiClientV3;
-          endpoint = PROJECT_ENDPOINTS.CREATE;
-          console.log('✓ MANAGER creating PARENT PROJECT, using API v3');
+          console.log('✅ PARENT PROJECT -> Using API v3 (Manager only)');
         } else {
+          // User cố gắng tạo parent project -> gửi về v1 nhưng sẽ bị server reject
           apiBaseUrl = `${API_CONFIG.BASE_URL}/api/v1`;
-          apiClient = apiClientV1;
-          endpoint = PROJECT_ENDPOINTS.CREATE;
-          console.log('⚠ USER should not create parent project, using API v1');
+          console.log('⚠ User trying to create parent project -> will be rejected by server');
         }
       }
     } else {
       apiBaseUrl = `${API_CONFIG.BASE_URL}/api/v1`;
-      apiClient = apiClientV1;
-      endpoint = PROJECT_ENDPOINTS.CREATE;
-      console.log('⚠ No user found, using default API v1');
     }
     
-    console.log('API Base URL:', apiBaseUrl);
-    console.log('API Endpoint:', endpoint);
+    const endpoint = PROJECT_ENDPOINTS.CREATE;
+    console.log('API URL:', `${apiBaseUrl}${endpoint}`);
     
-    let response;
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     
-    if (isFormData) {
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      const apiUrl = `${apiBaseUrl}${endpoint}`;
-      
-      response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        body: formData
-      });
-      
-      console.log('Fetch response status:', response.status);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Fetch error response:', errorText);
-        throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
-      }
-      
-      response = await response.json();
-    } else {
-      console.log('JSON data:', formData);
-      response = await apiClient.post(endpoint, formData);
+    const response = await fetch(`${apiBaseUrl}${endpoint}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData
+    });
+    
+    console.log('Response Status:', response.status);
+    
+    const responseText = await response.text();
+    console.log('Raw Response:', responseText);
+    
+    let responseData;
+    try {
+      responseData = JSON.parse(responseText);
+    } catch (e) {
+      console.error('Parse JSON error:', e);
+      return {
+        success: false,
+        code: 500,
+        message: 'Response không phải JSON hợp lệ'
+      };
     }
     
-    console.log('=== CREATE PROJECT SUCCESS ===');
     return {
-      success: response?.code === 200 || response?.success === true,
-      message: response?.message || 'Thành công',
-      data: response?.data || response
+      success: responseData.code === 200,
+      code: responseData.code || response.status,
+      message: responseData.message || (responseData.success ? 'Thành công' : 'Thất bại'),
+      data: responseData.data
     };
+    
   } catch (error) {
-    console.error('=== ERROR IN CREATE PROJECT ===');
-    console.error('Error creating project:', error);
-    
-    let errorMessage = 'Tạo dự án thất bại!';
-    if (error.message.includes('401')) {
-      errorMessage = 'Bạn cần đăng nhập để tạo dự án!';
-    } else if (error.message.includes('403')) {
-      errorMessage = 'Bạn không có quyền tạo dự án!';
-    } else if (error.message.includes('404')) {
-      errorMessage = 'API không tồn tại hoặc không tìm thấy!';
-    }
-    
-    throw new Error(`${errorMessage} Chi tiết: ${error.message}`);
+    console.error('🔥 SERVICE ERROR:', error);
+    return {
+      success: false,
+      code: 500,
+      message: 'Lỗi kết nối: ' + error.message
+    };
   }
 };
 
-// 🎯 QUAN TRỌNG: Sửa hàm updateProject để xử lý response đúng
+// Cập nhật dự án
 export const updateProject = async (id, formData) => {
   try {
     console.log('=== UPDATE PROJECT SERVICE ===');
@@ -367,10 +407,7 @@ export const updateProject = async (id, formData) => {
       };
     }
     
-    // 🎯 QUAN TRỌNG: Kiểm tra code trong response body
-    // Backend trả về: {code: 200, message: "success"} khi thành công
-    // Backend trả về: {code: 404, message: "dismiss"} khi thất bại
-    
+    // Kiểm tra code trong response body
     const success = responseData.code === 200;
     
     return {
@@ -393,7 +430,6 @@ export const updateProject = async (id, formData) => {
   }
 };
 
-// Xóa dự án
 // Xóa dự án
 export const deleteProject = async (id) => {
   try {
@@ -523,7 +559,7 @@ export const changeMultipleProjects = async (ids, key, value) => {
   }
 };
 
-// Lấy sub-projects (dự án con)
+// Lấy sub-projects (dự án con) - DÙNG API CŨ (có thể xóa sau khi chuyển sang getTasksByParent)
 export const getSubProjects = async (parentId, params = {}) => {
   try {
     const response = await apiClientV1.get(PROJECT_ENDPOINTS.LIST, {
@@ -543,10 +579,11 @@ export const getSubProjects = async (parentId, params = {}) => {
   }
 };
 
-// Export tất cả functions
+// Export tất cả functions - THÊM getTasksByParent
 export default {
   getProjects,
   getProjectDetail,
+  getTasksByParent, // THÊM DÒNG NÀY
   getSubProjects,
   createProject,
   updateProject,

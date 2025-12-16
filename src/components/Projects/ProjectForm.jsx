@@ -487,48 +487,48 @@ const ProjectForm = ({
       <Row gutter={16}>
         <Col span={24}>
           <Form.Item
-  name="listUser"
-  label="Thành viên tham gia"
-  valuePropName="value" // Thêm dòng này
->
-  <Select
-    mode="multiple"
-    placeholder="Chọn thành viên tham gia dự án"
-    optionFilterProp="children"
-    showSearch
-    allowClear
-    size="large"
-    maxTagCount={3}
-    maxTagTextLength={15}
-    suffixIcon={<TeamOutlined />}
-    filterOption={(input, option) =>
-      option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
-    }
-    onChange={(value) => {
-      console.log('Select onChange - listUser selected:', value);
-      form.setFieldValue('listUser', value);
-    }}
-  >
-    {users
-      .filter(u => currentUser && u._id !== currentUser.id)
-      .map(user => (
-        <Option key={user._id} value={user._id}>
-          <Space>
-            <Avatar 
-              size="small" 
-              src={user.avatar} 
-              icon={<UserOutlined />} 
-              style={{ backgroundColor: user.avatar ? 'transparent' : '#1890ff' }}
-            />
-            <span>{user.fullName}</span>
-            <Text type="secondary" style={{ fontSize: '12px' }}>
-              ({user.email})
-            </Text>
-          </Space>
-        </Option>
-      ))}
-  </Select>
-</Form.Item>
+            name="listUser"
+            label="Thành viên tham gia"
+            valuePropName="value" // Thêm dòng này
+          >
+            <Select
+              mode="multiple"
+              placeholder="Chọn thành viên tham gia dự án"
+              optionFilterProp="children"
+              showSearch
+              allowClear
+              size="large"
+              maxTagCount={3}
+              maxTagTextLength={15}
+              suffixIcon={<TeamOutlined />}
+              filterOption={(input, option) =>
+                option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+              }
+              onChange={(value) => {
+                console.log('Select onChange - listUser selected:', value);
+                form.setFieldValue('listUser', value);
+              }}
+            >
+              {users
+                .filter(u => currentUser && u._id !== currentUser.id)
+                .map(user => (
+                  <Option key={user._id} value={user._id}>
+                    <Space>
+                      <Avatar 
+                        size="small" 
+                        src={user.avatar} 
+                        icon={<UserOutlined />} 
+                        style={{ backgroundColor: user.avatar ? 'transparent' : '#1890ff' }}
+                      />
+                      <span>{user.fullName}</span>
+                      <Text type="secondary" style={{ fontSize: '12px' }}>
+                        ({user.email})
+                      </Text>
+                    </Space>
+                  </Option>
+                ))}
+            </Select>
+          </Form.Item>
         </Col>
       </Row>
 

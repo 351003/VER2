@@ -21,7 +21,7 @@ import Reports from './pages/Reports/Reports';
 import PersonalReports from './pages/Reports/PersonalReports';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import Profile from './pages/Profile/Profile';
-
+import SubProjectDetail from './pages/Projects/SubProjectDetail';
 // ✅ Route bảo vệ DUY NHẤT - SỬA LẠI
 const ProtectedRoute = ({ children, requireManager = false }) => {
   const { user, loading, isManager } = useAuth();
@@ -91,6 +91,7 @@ function App() {
                 {/* Projects */}
                 <Route path="projects" element={<Projects />} />
                 <Route path="projects/detail/:id" element={<ProjectDetail />} />
+                <Route path="projects/detail/:parentId/subproject/:id" element={<SubProjectDetail />} />
 
                 {/* Teams */}
                 <Route path="teams" element={<Teams />} />

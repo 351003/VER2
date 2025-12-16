@@ -92,35 +92,39 @@ import { apiClientV1, API_CONFIG } from './api';
 
 const taskService = {
   // Lấy danh sách tasks với phân trang và tìm kiếm
-  async getTasks(params = {}) {
-    try {
-      console.log('taskService.getTasks called with params:', params);
-      const response = await apiClientV1.get(API_CONFIG.ENDPOINTS.TASKS.LIST, { 
-        params: {
-          page: params.page || 1,
-          limit: params.limit || 50,
-          keyword: params.keyword || params.search, // Support both keyword and search
-          status: params.status,
-          sortBy: params.sortBy,
-          sortOrder: params.sortOrder
-        }
-      });
-      
-      console.log('getTasks response:', response);
-      
-      // Backend trả về array tasks trực tiếp hoặc format {code, data}
-      // Nếu là array thì return luôn, nếu có code field thì check
-      if (response.code && response.code !== 200) {
-        throw new Error(response.message || 'Lỗi lấy danh sách công việc');
-      }
-      
-      return response;
-    } catch (error) {
-      console.error('getTasks error:', error);
-      console.log('Response data:', error.response?.data);
-      throw error;
+async getTasks(params = {}) {
+  try {
+    console.log('taskService.getTasks called with params:', params);
+    const apiParams = {
+      page: params.page || 1,
+      limit: params.limit || (params.forBoard ? 200 : 10), // Nếu forBoard thì limit cao
+      keyword: params.keyword || params.search,
+      status: params.status,
+      sortBy: params.sortBy,
+      sortOrder: params.sortOrder
+    };
+    
+    // Thêm param forBoard nếu có
+    if (params.forBoard) {
+      apiParams.forBoard = params.forBoard;
     }
-  },
+    
+    const response = await apiClientV1.get(API_CONFIG.ENDPOINTS.TASKS.LIST, { 
+      params: apiParams
+    });
+    
+    console.log('getTasks response:', response);
+    
+    if (response.code && response.code !== 200) {
+      throw new Error(response.message || 'Lỗi lấy danh sách công việc');
+    }
+    
+    return response;
+  } catch (error) {
+    console.error('getTasks error:', error);
+    throw error;
+  }
+},
 
   // Lấy chi tiết task
   async getTaskDetail(id) {

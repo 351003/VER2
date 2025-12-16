@@ -16,6 +16,7 @@ import {
   Spin,
   Pagination,
   App,
+  Alert,
 } from "antd";
 import {
   PlusOutlined,
@@ -46,77 +47,98 @@ const PersonalTasks = () => {
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterPriority, setFilterPriority] = useState("all");
   const [viewMode, setViewMode] = useState("board");
-  //add
   const [users, setUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
+  
+  // State cho phân trang (chỉ dùng cho list view)
   const [pagination, setPagination] = useState({
     current: 1,
     pageSize: 10,
     total: 0,
   });
-  // // Mock users data
-  // const users = [
-  //   { id: 1, name: 'Nguyễn Văn A', email: 'a@example.com', avatar: null },
-  //   { id: 2, name: 'Trần Thị B', email: 'b@example.com', avatar: null },
-  //   { id: 3, name: 'Lê Văn C', email: 'c@example.com', avatar: null },
-  // ];
+  
+  // State riêng cho board view (load tất cả tasks)
+  const [boardTasks, setBoardTasks] = useState([]);
+  const [boardLoading, setBoardLoading] = useState(false);
 
-  // Load tasks từ API
+  // Load tasks cho list view (có phân trang)
   const loadTasks = async (page = 1, search = "") => {
+    if (viewMode === "board") return; // Không load cho board
+    
     setLoading(true);
     try {
       const keywordToSend = (search || searchText || "").trim();
       const params = {
         page,
         limit: pagination.pageSize,
-        keyword: keywordToSend, // Always send keyword (empty string if no search)
+        keyword: keywordToSend,
         status: filterStatus !== "all" ? filterStatus : undefined,
+        forBoard: 'false' // Explicitly not for board
       };
 
-      console.log("getTasks params:", params);
       const response = await taskService.getTasks(params);
-      console.log("getTasks response:", response);
       
-      // Backend trả về {code, message, data, pagination}
+      console.log("🚀 API RESPONSE PAGINATION:", {
+      total: response.pagination?.total,
+      totalPage: response.pagination?.totalPage,
+      limitItem: response.pagination?.limitItem,
+      calculated: response.pagination?.totalPage * response.pagination?.limitItem,
+      fullResponse: response  // Xem toàn bộ response
+    });
       if (response.code === 200) {
         setTasks(response.data || []);
+        setFilteredTasks(response.data || []);
         
-        setPagination((prev) => ({
-          ...prev,
-          current: page,
-          total: response.pagination?.total || response.data?.length || 0,
-        }));
-      } else if (response.data && Array.isArray(response.data)) {
-        // Fallback nếu response là {data: [...]}
-        setTasks(response.data);
-
-        setPagination((prev) => ({
-          ...prev,
-          current: page,
-          total: response.total || response.data.length,
-        }));
-      } else if (Array.isArray(response)) {
-        // Fallback nếu response là array trực tiếp
-        setTasks(response);
-        setPagination((prev) => ({
-          ...prev,
-          current: page,
-          total: response.length,
-        }));
+        if (response.pagination) {
+          setPagination({
+            current: response.pagination.currentPage || page,
+            pageSize: response.pagination.limitItem || pagination.pageSize,
+            total: response.pagination.total || 0,
+          });
+        }
       } else {
         setTasks([]);
+        setFilteredTasks([]);
+      
       }
+      
     } catch (error) {
       console.error("Error loading tasks:", error);
       message.error(error.message || "Không thể tải danh sách công việc");
       setTasks([]);
+      setFilteredTasks([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Load users từ API
+  // Load tasks cho board view (tất cả tasks)
+  const loadBoardTasks = async () => {
+    setBoardLoading(true);
+    try {
+      const params = {
+        forBoard: 'true', // Flag để backend trả về tất cả tasks
+        status: filterStatus !== "all" ? filterStatus : undefined,
+        keyword: searchText || undefined,
+      };
+
+      const response = await taskService.getTasks(params);
+      
+      if (response.code === 200) {
+        setBoardTasks(response.data || []);
+      } else {
+        setBoardTasks([]);
+      }
+    } catch (error) {
+      console.error("Error loading board tasks:", error);
+      setBoardTasks([]);
+    } finally {
+      setBoardLoading(false);
+    }
+  };
+
+  // Load users
   const loadUsers = async () => {
     setUsersLoading(true);
     try {
@@ -137,59 +159,51 @@ const PersonalTasks = () => {
     }
   };
 
-  // Load mock data
+  // Initial load
   useEffect(() => {
-    loadTasks(1); //add 1
-    //add
     loadUsers();
+    if (viewMode === "board") {
+      loadBoardTasks();
+    } else {
+      loadTasks(1);
+    }
   }, []);
 
+  // Khi viewMode thay đổi
   useEffect(() => {
-    filterTasks();
-  }, [tasks, searchText, filterStatus]); //filterPriority
+    if (viewMode === "board") {
+      loadBoardTasks();
+    } else {
+      loadTasks(1);
+    }
+  }, [viewMode]);
 
-  //ADD
-  // Tìm kiếm real-time
+  // Khi filter thay đổi
   useEffect(() => {
-    console.log("Search effect triggered, searchText:", searchText);
+    if (viewMode === "board") {
+      loadBoardTasks();
+    } else {
+      loadTasks(1);
+    }
+  }, [filterStatus, searchText]);
+
+  // Search với debounce
+  useEffect(() => {
     const delaySearch = setTimeout(() => {
-      console.log("Debounce timer fired, calling loadTasks with searchText:", searchText);
-      loadTasks(1, searchText);
+      if (viewMode === "board") {
+        loadBoardTasks();
+      } else {
+        loadTasks(1, searchText);
+      }
     }, 500);
 
     return () => clearTimeout(delaySearch);
   }, [searchText]);
 
-  // Filter khi status thay đổi
-  useEffect(() => {
-    loadTasks(1);
-  }, [filterStatus]);
-
-  const filterTasks = () => {
-    let filtered = tasks;
-
-    // ADD
-    // Filter client-side cho trường hợp backend không hỗ trợ filter
-    if (searchText && !pagination.total) {
-      filtered = filtered.filter(
-        (task) =>
-          task.title?.toLowerCase().includes(searchText.toLowerCase()) ||
-          task.content?.toLowerCase().includes(searchText.toLowerCase())
-      );
-    }
-
-    if (filterStatus !== "all" && !pagination.total) {
-      filtered = filtered.filter((task) => task.status === filterStatus);
-    }
-
-    setFilteredTasks(filtered);
-  };
-
   // Tạo task mới
   const handleCreateTask = async (values) => {
     setFormLoading(true);
     try {
-      // Chuẩn bị dữ liệu gửi lên backend
       const taskData = {
         title: values.title,
         content: values.content,
@@ -197,21 +211,22 @@ const PersonalTasks = () => {
         timeStart: values.timeStart,
         timeFinish: values.timeFinish,
         priority: values.priority,
-        // tags: values.tags,
       };
 
-      // Thêm assigneeId nếu có
       if (values.assigneeId) {
         taskData.assigneeId = values.assigneeId;
       }
 
-      console.log("Creating task with data:", taskData);
-      console.log("Token:", localStorage.getItem('token'));
-      
       await taskService.createTask(taskData);
       message.success("Tạo công việc thành công!");
       setModalVisible(false);
-      loadTasks(1); // Reload trang đầu tiên
+      
+      // Reload dữ liệu
+      if (viewMode === "board") {
+        loadBoardTasks();
+      } else {
+        loadTasks(1); // Task mới sẽ ở đầu trang 1
+      }
     } catch (error) {
       console.error("Create task error:", error);
       message.error(error.message);
@@ -220,13 +235,10 @@ const PersonalTasks = () => {
     }
   };
 
-  // Cập nhật task
+  // Update task
   const handleUpdateTask = async (values) => {
     setFormLoading(true);
     try {
-      console.log("Updating task:", editingTask);
-      console.log("Task ID:", editingTask?._id);
-      
       const taskData = {
         title: values.title,
         content: values.content,
@@ -237,7 +249,6 @@ const PersonalTasks = () => {
         tags: values.tags,
       };
 
-      // Thêm assigneeId nếu có
       if (values.assigneeId) {
         taskData.assigneeId = values.assigneeId;
       }
@@ -252,7 +263,13 @@ const PersonalTasks = () => {
       message.success("Cập nhật công việc thành công!");
       setModalVisible(false);
       setEditingTask(null);
-      loadTasks(pagination.current);
+      
+      // Reload dữ liệu
+      if (viewMode === "board") {
+        loadBoardTasks();
+      } else {
+        loadTasks(pagination.current);
+      }
     } catch (error) {
       message.error(error.message);
     } finally {
@@ -260,56 +277,51 @@ const PersonalTasks = () => {
     }
   };
 
-  // Xoá task
+  // Delete task
   const handleDeleteTask = (taskId) => {
-    console.log("handleDeleteTask called with taskId:", taskId);
-    console.log("Opening modal.confirm...");
-    
-    try {
-      modal.confirm({
-        title: "Xác nhận xóa",
-        content: "Bạn có chắc chắn muốn xóa công việc này?",
-        okText: "Xóa",
-        cancelText: "Hủy",
-        okType: "danger",
-        onOk: async () => {
-          console.log("Modal onOk called, deleting task with ID:", taskId);
-          try {
-            const response = await taskService.deleteTask(taskId);
-            console.log("Delete response:", response);
-            message.success("Xóa công việc thành công!");
+    modal.confirm({
+      title: "Xác nhận xóa",
+      content: "Bạn có chắc chắn muốn xóa công việc này?",
+      okText: "Xóa",
+      cancelText: "Hủy",
+      okType: "danger",
+      onOk: async () => {
+        try {
+          await taskService.deleteTask(taskId);
+          message.success("Xóa công việc thành công!");
+          
+          // Reload dữ liệu
+          if (viewMode === "board") {
+            loadBoardTasks();
+          } else {
             loadTasks(pagination.current);
-          } catch (error) {
-            console.error("Delete error:", error);
-            message.error(error.message || "Lỗi xóa công việc");
           }
-        },
-        onCancel() {
-          console.log("Modal cancelled");
-        },
-      });
-      console.log("modal.confirm called successfully");
-    } catch (error) {
-      console.error("Error in handleDeleteTask:", error);
-    }
+        } catch (error) {
+          message.error(error.message || "Lỗi xóa công việc");
+        }
+      },
+    });
   };
 
-  // Thay đổi trạng thái task
+  // Change task status (for drag & drop)
   const handleTaskMove = async (taskId, newStatus) => {
-    console.log("handleTaskMove called:", { taskId, newStatus });
     try {
       await taskService.changeTaskStatus(taskId, newStatus);
       message.success("Cập nhật trạng thái công việc thành công!");
-      loadTasks(pagination.current);
+      
+      // Reload dữ liệu
+      if (viewMode === "board") {
+        loadBoardTasks();
+      } else {
+        loadTasks(pagination.current);
+      }
     } catch (error) {
       console.error("handleTaskMove error:", error);
       message.error(error.message || "Lỗi cập nhật trạng thái");
-      // Rollback UI nếu cần
-      loadTasks(pagination.current);
     }
   };
 
-  // Xem chi tiết task
+  // View task detail
   const handleViewTaskDetail = async (taskId) => {
     try {
       const taskDetail = await taskService.getTaskDetail(taskId);
@@ -339,7 +351,7 @@ const PersonalTasks = () => {
     setFormLoading(false);
   };
 
-  // Xử lý phân trang
+  // Handle pagination change (only for list view)
   const handlePageChange = (page, pageSize) => {
     setPagination((prev) => ({ ...prev, current: page, pageSize }));
     loadTasks(page);
@@ -347,18 +359,21 @@ const PersonalTasks = () => {
 
   // Refresh data
   const handleRefresh = () => {
-    loadTasks(pagination.current);
     loadUsers();
+    if (viewMode === "board") {
+      loadBoardTasks();
+    } else {
+      loadTasks(pagination.current);
+    }
   };
 
   // Map task từ backend sang frontend format
   const mapTaskFromBackend = (task) => {
     return {
       ...task,
-      id: task.id || task._id, // Hỗ trợ cả id và _id
+      id: task.id || task._id,
       description: task.content,
       dueDate: task.timeFinish,
-      // Đảm bảo các trường required có giá trị mặc định
       title: task.title || "Không có tiêu đề",
       status: task.status || "todo",
       content: task.content || "",
@@ -383,14 +398,16 @@ const PersonalTasks = () => {
               Công Việc Cá Nhân
             </Title>
             <p style={{ margin: 0, color: "#666" }}>
-              Tổng số: {pagination.total || tasks.length} công việc
+              {viewMode === "board" 
+                ? `Tổng số: ${boardTasks.length} công việc` 
+                : `Trang ${pagination.current} • Tổng số: ${pagination.total} công việc`}
             </p>
           </div>
           <Space>
             <Button
               icon={<ReloadOutlined />}
               onClick={handleRefresh}
-              loading={loading}
+              loading={viewMode === "board" ? boardLoading : loading}
             >
               Làm mới
             </Button>
@@ -401,7 +418,6 @@ const PersonalTasks = () => {
                 setEditingTask(null);
                 setModalVisible(true);
               }}
-              loading={loading}
             >
               Tạo Công Việc
             </Button>
@@ -417,16 +433,9 @@ const PersonalTasks = () => {
               placeholder="Tìm kiếm theo tên công việc..."
               prefix={<SearchOutlined />}
               value={searchText}
-              onChange={(e) => {
-                console.log("Search onChange:", e.target.value);
-                setSearchText(e.target.value);
-              }}
+              onChange={(e) => setSearchText(e.target.value)}
               allowClear
-              onSearch={(value) => {
-                console.log("Search onSearch triggered with value:", value);
-                setSearchText(value);
-                loadTasks(1, value);
-              }}
+              onSearch={(value) => setSearchText(value)}
             />
           </Col>
           <Col xs={12} md={6}>
@@ -464,11 +473,22 @@ const PersonalTasks = () => {
         </Row>
       </Card>
 
+      {/* Info Alert for Board View */}
+      {viewMode === "board" && boardTasks.length > 50 && (
+        <Alert
+          message="Thông tin"
+          description={`Đang hiển thị ${boardTasks.length} công việc. Sử dụng bộ lọc để tìm kiếm nhanh hơn.`}
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+      )}
+
       {/* Tasks Display */}
-      <Spin spinning={loading}>
+      <Spin spinning={viewMode === "board" ? boardLoading : loading}>
         {viewMode === "board" ? (
           <TaskBoard
-            tasks={filteredTasks.map(mapTaskFromBackend)}
+            tasks={boardTasks.map(mapTaskFromBackend)}
             onEditTask={handleEditTask}
             onDeleteTask={handleDeleteTask}
             onTaskMove={handleTaskMove}
@@ -499,8 +519,8 @@ const PersonalTasks = () => {
               )}
             </Row>
 
-            {/* Pagination */}
-            {pagination.total > pagination.pageSize && (
+            {/* Pagination chỉ cho list view */}
+            {viewMode === "list" && pagination.total > pagination.pageSize && (
               <div style={{ marginTop: 16, textAlign: "center" }}>
                 <Pagination
                   current={pagination.current}
@@ -535,14 +555,13 @@ const PersonalTasks = () => {
           initialValues={editingTask}
           loading={formLoading}
           users={users}
-          showAssignee={false} // Đặt false cho công việc cá nhân
+          showAssignee={false}
         />
       </Modal>
     </div>
   );
 };
 
-// Wrap component trong App context
 const PersonalTasksWithApp = () => {
   return (
     <App>
