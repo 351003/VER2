@@ -1,42 +1,114 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Form, Input, Select, DatePicker, Button, Space, Avatar, Row, Col, Switch } from 'antd';
 import { UserOutlined, TeamOutlined } from '@ant-design/icons';
-import moment from 'moment';
+import dayjs from 'dayjs';
 
 const { Option } = Select;
 const { TextArea } = Input;
-const { RangePicker } = DatePicker;
 
-const EventForm = ({ visible, onCancel, onFinish, initialValues, loading, users = [] }) => {
+const EventForm = ({ 
+  visible, 
+  onCancel, 
+  onFinish, 
+  initialValues, 
+  loading, 
+  users = [],
+  isViewMode = false // Thêm prop mới
+}) => {
   const [form] = Form.useForm();
+  const [startDate, setStartDate] = useState(null);
+  const [endDate, setEndDate] = useState(null);
 
   useEffect(() => {
     if (visible) {
+      form.resetFields();
+      
       if (initialValues) {
+        console.log('📅 Initial values for form:', initialValues);
+        
+        let start = null;
+        let end = null;
+        
+        if (initialValues.start && initialValues.end) {
+          try {
+            start = dayjs(initialValues.start);
+            end = dayjs(initialValues.end);
+            
+            if (!start.isValid() || !end.isValid()) {
+              console.warn('⚠️ Invalid dates, using defaults');
+              start = dayjs();
+              end = dayjs().add(1, 'hour');
+            }
+          } catch (error) {
+            console.error('❌ Error parsing dates:', error);
+            start = dayjs();
+            end = dayjs().add(1, 'hour');
+          }
+        } else {
+          start = dayjs();
+          end = dayjs().add(1, 'hour');
+        }
+
+        console.log('📅 Parsed dates:', { start, end });
+
+        setStartDate(start);
+        setEndDate(end);
+
+        const participantIds = initialValues.participants?.map(p => p.id) || 
+                             initialValues.participantIds || [];
+
         form.setFieldsValue({
-          ...initialValues,
-          dateRange: initialValues.start && initialValues.end ? 
-            [moment(initialValues.start), moment(initialValues.end)] : null,
-          participants: initialValues.participants?.map(p => p.id) || []
+          title: initialValues.title || '',
+          description: initialValues.description || '',
+          type: initialValues.type || 'meeting',
+          startDate: start,
+          endDate: end,
+          participants: participantIds,
+          location: initialValues.location || '',
+          isAllDay: initialValues.isAllDay || false,
+          isRecurring: initialValues.isRecurring || false
         });
       } else {
-        form.resetFields();
+        const now = dayjs();
+        const later = dayjs().add(1, 'hour');
+        
+        console.log('📅 Default dates:', { now, later });
+        
+        setStartDate(now);
+        setEndDate(later);
+        
+        form.setFieldsValue({
+          type: 'meeting',
+          startDate: now,
+          endDate: later,
+          isAllDay: false,
+          isRecurring: false
+        });
       }
     }
   }, [visible, initialValues, form]);
 
   const handleFinish = (values) => {
+    if (isViewMode) {
+      onCancel(); // Nếu đang ở chế độ xem, chỉ đóng form
+      return;
+    }
+    
+    console.log('✅ Form values:', values);
+    
     const eventData = {
-      ...values,
-      start: values.dateRange[0].toISOString(),
-      end: values.dateRange[1].toISOString(),
-      participants: values.participants ? users.filter(user => values.participants.includes(user.id)) : [],
-      assignee: users.find(user => user.id === values.assigneeId)
+      title: values.title,
+      description: values.description || '',
+      type: values.type,
+      participants: values.participants || [],
+      start: values.startDate.toISOString(),
+      end: values.endDate.toISOString(),
+      location: values.location || '',
+      isAllDay: values.isAllDay || false,
+      isRecurring: values.isRecurring || false
     };
     
-    delete eventData.dateRange;
-    delete eventData.assigneeId;
-    
+    console.log('📤 Submitting event data:', eventData);
     onFinish(eventData);
   };
 
@@ -48,8 +120,25 @@ const EventForm = ({ visible, onCancel, onFinish, initialValues, loading, users 
     { value: 'reminder', label: 'Nhắc nhở', color: '#faad14' }
   ];
 
-  const getEventTypeColor = (type) => {
-    return eventTypes.find(t => t.value === type)?.color || '#1890ff';
+  // Hàm xử lý khi thay đổi ngày bắt đầu
+  const handleStartDateChange = (date) => {
+    if (isViewMode) return; // Không cho phép thay đổi khi ở chế độ xem
+    
+    setStartDate(date);
+    
+    if (date && endDate && date.isAfter(endDate)) {
+      const newEndDate = date.add(1, 'hour');
+      setEndDate(newEndDate);
+      form.setFieldsValue({
+        endDate: newEndDate
+      });
+    }
+  };
+
+  // Hàm xử lý khi thay đổi ngày kết thúc
+  const handleEndDateChange = (date) => {
+    if (isViewMode) return; // Không cho phép thay đổi khi ở chế độ xem
+    setEndDate(date);
   };
 
   return (
@@ -57,7 +146,7 @@ const EventForm = ({ visible, onCancel, onFinish, initialValues, loading, users 
       form={form}
       layout="vertical"
       onFinish={handleFinish}
-      disabled={loading}
+      disabled={loading || isViewMode} // Disable form khi ở chế độ xem
     >
       <Row gutter={16}>
         <Col span={24}>
@@ -66,7 +155,10 @@ const EventForm = ({ visible, onCancel, onFinish, initialValues, loading, users 
             label="Tiêu đề sự kiện"
             rules={[{ required: true, message: 'Vui lòng nhập tiêu đề sự kiện!' }]}
           >
-            <Input placeholder="Nhập tiêu đề sự kiện" />
+            <Input 
+              placeholder="Nhập tiêu đề sự kiện" 
+              readOnly={isViewMode} // Chỉ đọc khi ở chế độ xem
+            />
           </Form.Item>
         </Col>
       </Row>
@@ -80,6 +172,7 @@ const EventForm = ({ visible, onCancel, onFinish, initialValues, loading, users 
             <TextArea 
               rows={3} 
               placeholder="Mô tả chi tiết về sự kiện..." 
+              readOnly={isViewMode} // Chỉ đọc khi ở chế độ xem
             />
           </Form.Item>
         </Col>
@@ -92,7 +185,10 @@ const EventForm = ({ visible, onCancel, onFinish, initialValues, loading, users 
             label="Loại sự kiện"
             rules={[{ required: true, message: 'Vui lòng chọn loại sự kiện!' }]}
           >
-            <Select placeholder="Chọn loại sự kiện">
+            <Select 
+              placeholder="Chọn loại sự kiện"
+              disabled={isViewMode} // Disable khi ở chế độ xem
+            >
               {eventTypes.map(type => (
                 <Option key={type.value} value={type.value}>
                   <Space>
@@ -111,44 +207,95 @@ const EventForm = ({ visible, onCancel, onFinish, initialValues, loading, users 
             </Select>
           </Form.Item>
         </Col>
-        <Col span={12}>
-          <Form.Item
-            name="assigneeId"
-            label="Người phụ trách"
-          >
-            <Select 
-              placeholder="Chọn người phụ trách"
-              allowClear
-              showSearch
-              optionFilterProp="children"
-            >
-              {users.map(user => (
-                <Option key={user.id} value={user.id}>
-                  <Space>
-                    <Avatar size="small" src={user.avatar} icon={<UserOutlined />} />
-                    <span>{user.name}</span>
-                  </Space>
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
-        </Col>
       </Row>
 
       <Row gutter={16}>
-        <Col span={24}>
+        <Col span={12}>
           <Form.Item
-            name="dateRange"
-            label="Thời gian"
-            rules={[{ required: true, message: 'Vui lòng chọn thời gian!' }]}
+            name="startDate"
+            label="Thời gian bắt đầu"
+            rules={[{ required: true, message: 'Vui lòng chọn thời gian bắt đầu!' }]}
           >
-            <RangePicker
-              showTime={{
+            <DatePicker
+              showTime={{ 
                 format: 'HH:mm',
+                minuteStep: 15,
+                hideDisabledOptions: true
               }}
               format="DD/MM/YYYY HH:mm"
               style={{ width: '100%' }}
-              placeholder={['Bắt đầu', 'Kết thúc']}
+              placeholder="Chọn ngày và giờ bắt đầu"
+              onChange={handleStartDateChange}
+              allowClear={false}
+              defaultOpenValue={dayjs()}
+              disabled={isViewMode} // Disable khi ở chế độ xem
+            />
+          </Form.Item>
+        </Col>
+        <Col span={12}>
+          <Form.Item
+            name="endDate"
+            label="Thời gian kết thúc"
+            rules={[{ 
+              required: true, 
+              message: 'Vui lòng chọn thời gian kết thúc!',
+            }, 
+            ({ getFieldValue }) => ({
+              validator(_, value) {
+                if (!value || !getFieldValue('startDate')) {
+                  return Promise.resolve();
+                }
+                if (value.isBefore(getFieldValue('startDate'))) {
+                  return Promise.reject(new Error('Thời gian kết thúc phải sau thời gian bắt đầu!'));
+                }
+                return Promise.resolve();
+              },
+            })]}
+          >
+            <DatePicker
+              showTime={{ 
+                format: 'HH:mm',
+                minuteStep: 15,
+                hideDisabledOptions: true
+              }}
+              format="DD/MM/YYYY HH:mm"
+              style={{ width: '100%' }}
+              placeholder="Chọn ngày và giờ kết thúc"
+              onChange={handleEndDateChange}
+              allowClear={false}
+              defaultOpenValue={dayjs().add(1, 'hour')}
+              disabled={isViewMode} // Disable khi ở chế độ xem
+              disabledDate={(current) => {
+                if (isViewMode) return false; // Không disable khi ở chế độ xem
+                return startDate && current && current.isBefore(startDate.startOf('day'));
+              }}
+              disabledTime={(current) => {
+                if (isViewMode) return {}; // Không disable khi ở chế độ xem
+                if (!startDate || !current) return {};
+                
+                if (current.isSame(startDate, 'day')) {
+                  return {
+                    disabledHours: () => {
+                      const hours = [];
+                      for (let i = 0; i < startDate.hour(); i++) {
+                        hours.push(i);
+                      }
+                      return hours;
+                    },
+                    disabledMinutes: (selectedHour) => {
+                      if (selectedHour === startDate.hour()) {
+                        const minutes = [];
+                        for (let i = 0; i < startDate.minute(); i++) {
+                          minutes.push(i);
+                        }
+                        return minutes;
+                      }
+                      return [];
+                    }
+                  };
+                }
+                return {};
+              }}
             />
           </Form.Item>
         </Col>
@@ -163,6 +310,8 @@ const EventForm = ({ visible, onCancel, onFinish, initialValues, loading, users 
           placeholder="Chọn thành viên tham gia"
           optionFilterProp="children"
           showSearch
+          allowClear
+          disabled={isViewMode} // Disable khi ở chế độ xem
         >
           {users.map(user => (
             <Option key={user.id} value={user.id}>
@@ -182,7 +331,7 @@ const EventForm = ({ visible, onCancel, onFinish, initialValues, loading, users 
             label="Cả ngày"
             valuePropName="checked"
           >
-            <Switch />
+            <Switch disabled={isViewMode} /> {/* Disable khi ở chế độ xem */}
           </Form.Item>
         </Col>
         <Col span={12}>
@@ -191,7 +340,7 @@ const EventForm = ({ visible, onCancel, onFinish, initialValues, loading, users 
             label="Lặp lại"
             valuePropName="checked"
           >
-            <Switch />
+            <Switch disabled={isViewMode} /> {/* Disable khi ở chế độ xem */}
           </Form.Item>
         </Col>
       </Row>
@@ -200,17 +349,30 @@ const EventForm = ({ visible, onCancel, onFinish, initialValues, loading, users 
         name="location"
         label="Địa điểm"
       >
-        <Input placeholder="Nhập địa điểm..." />
+        <Input 
+          placeholder="Nhập địa điểm..." 
+          readOnly={isViewMode} // Chỉ đọc khi ở chế độ xem
+        />
       </Form.Item>
 
       <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
         <Space>
-          <Button onClick={onCancel}>
-            Hủy
-          </Button>
-          <Button type="primary" htmlType="submit" loading={loading}>
-            {initialValues ? 'Cập nhật' : 'Tạo sự kiện'}
-          </Button>
+          {isViewMode ? (
+            // Chỉ hiển thị nút Đóng khi ở chế độ xem
+            <Button type="default" onClick={onCancel}>
+              Đóng
+            </Button>
+          ) : (
+            // Hiển thị nút Hủy và Cập nhật/Tạo khi ở chế độ chỉnh sửa/tạo mới
+            <>
+              <Button onClick={onCancel}>
+                Hủy
+              </Button>
+              <Button type="primary" htmlType="submit" loading={loading}>
+                {initialValues ? 'Cập nhật' : 'Tạo sự kiện'}
+              </Button>
+            </>
+          )}
         </Space>
       </Form.Item>
     </Form>

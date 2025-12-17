@@ -24,6 +24,7 @@ export const API_CONFIG = {
       ADMIN_LOGIN: '/api/v2/users/login',
     },
     
+    
     // Task endpoints (không cần /api/v1 prefix vì apiClientV1 đã có baseURL)
     TASKS: {
       LIST: '/tasks',
@@ -42,6 +43,13 @@ export const API_CONFIG = {
       EDIT: '/projects/edit',
       CHANGE_STATUS: '/projects/change-status',
       DELETE: '/projects/delete'
+    },
+    CALENDAR: {
+      LIST: '/calendars',
+      DETAIL: '/calendars/detail/:id',
+      CREATE: '/calendars/create',
+      EDIT: '/calendars/edit/:id',
+      DELETE: '/calendars/delete/:id'
     }
   }
 };
