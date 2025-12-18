@@ -1,234 +1,165 @@
-// // services/authService.js
-// import { apiClientV1, apiClientV3, API_CONFIG } from './api';
+// [file name]: services/authService.js
+import axios from 'axios';
 
-// // Helper để kiểm tra backend có chạy không
-// const checkBackend = async () => {
-//   try {
-//     // Thử ping backend
-//     await fetch(API_CONFIG.BASE_URL, { mode: 'no-cors' });
-//     return true;
-//   } catch (error) {
-//     return false;
-//   }
-// };
+const API_BASE_URL = 'http://localhost:3370';
 
-// const authService = {
-//   // ============ USER API v1 ============
-  
-//   // User Register
-//   async registerUser(userData) {
-//     const isBackendRunning = await checkBackend();
-    
-//     if (!isBackendRunning) {
-//       console.warn('⚠️ Backend not running, throwing network error for mock handling');
-//       throw new Error('Network Error');
-//     }
-    
-//     try {
-//       const response = await apiClientV1.post(API_CONFIG.ENDPOINTS.AUTH.USER_REGISTER, {
-//         fullName: userData.fullName,
-//         email: userData.email,
-//         password: userData.password
-//       });
-//       return response;
-//     } catch (error) {
-//       throw error;
-//     }
-//   },
+// Tạo các API client cho các version khác nhau
+const createApiClient = (baseURL) => {
+  const instance = axios.create({
+    baseURL,
+    timeout: 10000,
+  });
 
-//   // User Login
-//   async loginUser(email, password) {
-//     const isBackendRunning = await checkBackend();
-    
-//     if (!isBackendRunning) {
-//       console.warn('⚠️ Backend not running, throwing network error for mock handling');
-//       throw new Error('Network Error');
-//     }
-    
-//     try {
-//       const response = await apiClientV1.post(API_CONFIG.ENDPOINTS.AUTH.USER_LOGIN, {
-//         email,
-//         password
-//       });
-//       return response;
-//     } catch (error) {
-//       throw error;
-//     }
-//   },
+  // Request interceptor để thêm token
+  instance.interceptors.request.use(
+    (config) => {
+      const token = localStorage.getItem('token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      return config;
+    },
+    (error) => Promise.reject(error)
+  );
 
-//   // User Logout
-//   async logoutUser() {
-//     const isBackendRunning = await checkBackend();
-    
-//     if (!isBackendRunning) {
-//       console.warn('⚠️ Backend not running, throwing network error for mock handling');
-//       throw new Error('Network Error');
-//     }
-    
-//     try {
-//       const response = await apiClientV1.post(API_CONFIG.ENDPOINTS.AUTH.USER_LOGOUT);
-//       return response;
-//     } catch (error) {
-//       throw error;
-//     }
-//   },
+  // Response interceptor xử lý lỗi
+  instance.interceptors.response.use(
+    (response) => {
+      // Trả về data trực tiếp
+      return response.data;
+    },
+    (error) => {
+      // Xử lý lỗi 401 (unauthorized)
+      if (error.response?.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        // Chỉ redirect nếu không phải trang auth
+        const currentPath = window.location.pathname;
+        if (!currentPath.includes('/login') && 
+            !currentPath.includes('/register') &&
+            !currentPath.includes('/forgot-password')) {
+          window.location.href = '/login';
+        }
+      }
+      return Promise.reject(error);
+    }
+  );
 
-//   // User Forgot Password
-//   async forgotPassword(email) {
-//     const isBackendRunning = await checkBackend();
-    
-//     if (!isBackendRunning) {
-//       console.warn('⚠️ Backend not running, throwing network error for mock handling');
-//       throw new Error('Network Error');
-//     }
-    
-//     try {
-//       const response = await apiClientV1.post(API_CONFIG.ENDPOINTS.AUTH.USER_FORGOT_PASSWORD, { email });
-//       return response;
-//     } catch (error) {
-//       throw error;
-//     }
-//   },
+  return instance;
+};
 
-//   // User Verify OTP
-//   async verifyOTP(email, otp) {
-//     const isBackendRunning = await checkBackend();
-    
-//     if (!isBackendRunning) {
-//       console.warn('⚠️ Backend not running, throwing network error for mock handling');
-//       throw new Error('Network Error');
-//     }
-    
-//     try {
-//       const response = await apiClientV1.post(API_CONFIG.ENDPOINTS.AUTH.USER_VERIFY_OTP, { 
-//         email, 
-//         otp 
-//       });
-//       return response;
-//     } catch (error) {
-//       throw error;
-//     }
-//   },
+// Tạo các client RIÊNG BIỆT với userService.js của bạn
+export const profileApiV1 = createApiClient(`${API_BASE_URL}/api/v1`);
+export const profileApiV3 = createApiClient(`${API_BASE_URL}/api/v3`);
 
-//   // User Reset Password
-//   async resetPassword(email, otp, newPassword) {
-//     const isBackendRunning = await checkBackend();
-    
-//     if (!isBackendRunning) {
-//       console.warn('⚠️ Backend not running, throwing network error for mock handling');
-//       throw new Error('Network Error');
-//     }
-    
-//     try {
-//       const response = await apiClientV1.post(API_CONFIG.ENDPOINTS.AUTH.USER_RESET_PASSWORD, { 
-//         email, 
-//         otp, 
-//         newPassword 
-//       });
-//       return response;
-//     } catch (error) {
-//       throw error;
-//     }
-//   },
+// Service chuyên cho PROFILE (không ảnh hưởng đến userService.js cũ)
+const authService = {
+  // ========== PROFILE FUNCTIONS ==========
+  async getProfile() {
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const isManager = user.role === 'MANAGER' || user.role === 'manager';
+      const apiClient = isManager ? profileApiV3 : profileApiV1;
+      
+      const response = await apiClient.get('/users/detail');
+      
+      if (response.code !== 200) {
+        return {
+          success: false,
+          message: response.message || 'Không thể lấy thông tin'
+        };
+      }
+      
+      return {
+        success: true,
+        data: response.info,
+        message: response.message
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Lỗi kết nối'
+      };
+    }
+  },
 
-//   // ============ MANAGER API v3 ============
-  
-//   // Manager Login
-//   async loginManager(email, password) {
-//     const isBackendRunning = await checkBackend();
-    
-//     if (!isBackendRunning) {
-//       console.warn('⚠️ Backend not running, throwing network error for mock handling');
-//       throw new Error('Network Error');
-//     }
-    
-//     try {
-//       const response = await apiClientV3.post(API_CONFIG.ENDPOINTS.AUTH.MANAGER_LOGIN, {
-//         email,
-//         password
-//       });
-//       return response;
-//     } catch (error) {
-//       throw error;
-//     }
-//   },
+  async updateProfile(updateData) {
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const isManager = user.role === 'MANAGER' || user.role === 'manager';
+      const apiClient = isManager ? profileApiV3 : profileApiV1;
+      
+      // Tạo FormData nếu có file
+      let requestData = updateData;
+      let headers = {};
+      
+      if (updateData.avatarFile) {
+        const formData = new FormData();
+        formData.append('avatar', updateData.avatarFile);
+        
+        // Thêm các field khác
+        Object.keys(updateData).forEach(key => {
+          if (key !== 'avatarFile' && updateData[key] !== undefined) {
+            formData.append(key, updateData[key]);
+          }
+        });
+        
+        requestData = formData;
+        headers = { 'Content-Type': 'multipart/form-data' };
+      }
+      
+      const response = await apiClient.patch('/users/edit', requestData, { headers });
+      
+      if (response.code !== 200) {
+        return {
+          success: false,
+          message: response.message || 'Cập nhật thất bại'
+        };
+      }
+      
+      return {
+        success: true,
+        data: response,
+        message: response.message
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Cập nhật thất bại'
+      };
+    }
+  },
 
-//   // Manager Logout (endpoint /get theo yêu cầu)
-//   async logoutManager() {
-//     const isBackendRunning = await checkBackend();
-    
-//     if (!isBackendRunning) {
-//       console.warn('⚠️ Backend not running, throwing network error for mock handling');
-//       throw new Error('Network Error');
-//     }
-    
-//     try {
-//       const response = await apiClientV3.post(API_CONFIG.ENDPOINTS.AUTH.MANAGER_LOGOUT);
-//       return response;
-//     } catch (error) {
-//       throw error;
-//     }
-//   },
+  // ========== AUTH FUNCTIONS (chỉ cho profile, không trùng với userService) ==========
+  async logout() {
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const isManager = user.role === 'MANAGER' || user.role === 'manager';
+      const apiClient = isManager ? profileApiV3 : profileApiV1;
+      
+      const response = await apiClient.get('/users/logout');
+      return {
+        success: response.code === 200,
+        message: response.message
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message || 'Đăng xuất thất bại'
+      };
+    }
+  },
 
-//   // ============ HELPER FUNCTIONS ============
-  
-//   // Lưu session vào localStorage
-//   saveUserSession(token, user, version = 'v1') {
-//     localStorage.setItem('token', token);
-//     localStorage.setItem('user', JSON.stringify(user));
-//     localStorage.setItem('apiVersion', version);
-//   },
+  // ========== UTILITIES ==========
+  getAuthHeaders() {
+    const token = localStorage.getItem('token');
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  },
 
-//   // Xóa session
-//   clearUserSession() {
-//     localStorage.removeItem('token');
-//     localStorage.removeItem('user');
-//     localStorage.removeItem('apiVersion');
-//   },
+  getCurrentUser() {
+    const userStr = localStorage.getItem('user');
+    return userStr ? JSON.parse(userStr) : null;
+  }
+};
 
-//   // Kiểm tra đã đăng nhập chưa
-//   isAuthenticated() {
-//     const token = localStorage.getItem('token');
-//     const user = localStorage.getItem('user');
-//     return !!(token && user);
-//   },
-
-//   // Lấy thông tin user từ localStorage
-//   getCurrentUser() {
-//     const userStr = localStorage.getItem('user');
-//     if (!userStr) return null;
-    
-//     try {
-//       return JSON.parse(userStr);
-//     } catch (error) {
-//       console.error('Error parsing user data:', error);
-//       return null;
-//     }
-//   },
-
-//   // Lấy role của user
-//   getUserRole() {
-//     const user = this.getCurrentUser();
-//     return user?.role || null;
-//   },
-
-//   // Kiểm tra có phải manager không
-//   isManager() {
-//     const role = this.getUserRole();
-//     return role === 'MANAGER';
-//   },
-
-//   // Kiểm tra có phải admin không
-//   isAdmin() {
-//     const role = this.getUserRole();
-//     return role === 'ADMIN';
-//   },
-
-//   // Kiểm tra có phải user thường không
-//   isUser() {
-//     const role = this.getUserRole();
-//     return role === 'USER';
-//   }
-// };
-
-// export default authService;
+export default authService;

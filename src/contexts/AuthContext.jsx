@@ -56,73 +56,77 @@ export const AuthProvider = ({ children }) => {
         return { success: false, message: 'Không nhận được token từ server!' };
       }
       
-      // QUAN TRỌNG: Lấy user info từ response nếu có
+      // QUAN TRỌNG: Gọi API detail để lấy thông tin đầy đủ (bao gồm avatar)
       let userData;
       
-      if (response.data.user) {
-        // Trường hợp backend TRẢ VỀ user info trong login response
-        console.log('✅ Got user info from login response');
-        userData = {
-          _id: response.data.user._id, // ← ID THẬT từ backend
-          id: response.data.user._id, // ← Giữ cả id để tương thích
-          fullName: response.data.user.fullName,
-          email: response.data.user.email,
-          role: response.data.user.role || (isManager ? 'manager' : 'user'),
-          token: token
-        };
-      } else {
-        // Trường hợp backend KHÔNG trả về user info → gọi API detail
-        console.log('ℹ️ No user info in response, fetching from detail API...');
-        try {
-          const userResponse = await axios.get(
-            isManager 
-              ? 'http://localhost:3370/api/v3/users/detail'
-              : 'http://localhost:3370/api/v1/users/detail',
-            {
-              headers: { 
-                Cookie: `token=${token}`,
-                'Content-Type': 'application/json'
-              },
-              withCredentials: true
+      try {
+        console.log('ℹ️ Fetching user detail with token:', token.substring(0, 20) + '...');
+        
+        const detailResponse = await axios.get(
+          isManager 
+            ? 'http://localhost:3370/api/v3/users/detail'
+            : 'http://localhost:3370/api/v1/users/detail',
+          {
+            headers: { 
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
             }
-          );
-          
-          console.log('📥 User detail response:', userResponse.data);
-          
-          if (userResponse.data.code === 200 && userResponse.data.info) {
-            userData = {
-              _id: userResponse.data.info._id, // ← ID THẬT từ backend
-              id: userResponse.data.info._id, // ← Giữ cả id để tương thích
-              fullName: userResponse.data.info.fullName,
-              email: userResponse.data.info.email,
-              role: userResponse.data.info.role || (isManager ? 'manager' : 'user'),
-              token: token
-            };
-          } else {
-            // Fallback nếu không lấy được thông tin
-            throw new Error('Cannot get user info');
           }
-        } catch (detailError) {
-          console.error('❌ Failed to get user detail:', detailError);
-          
-          // ULTIMATE FALLBACK: Dùng email để tạo ID ổn định
+        );
+        
+        console.log('📥 User detail response:', detailResponse.data);
+        
+        if (detailResponse.data.code === 200 && detailResponse.data.info) {
+          userData = {
+            _id: detailResponse.data.info._id,
+            id: detailResponse.data.info._id,
+            fullName: detailResponse.data.info.fullName,
+            email: detailResponse.data.info.email,
+            role: detailResponse.data.info.role || (isManager ? 'manager' : 'user'),
+            avatar: detailResponse.data.info.avatar || '', // ← QUAN TRỌNG: Lấy avatar
+            phone: detailResponse.data.info.phone || '',
+            position_job: detailResponse.data.info.position_job || '',
+            token: token
+          };
+          console.log('✅ Got user info with avatar:', userData.avatar ? 'Yes' : 'No');
+        } else {
+          throw new Error('Cannot get user info from detail API');
+        }
+      } catch (detailError) {
+        console.error('❌ Failed to get user detail:', detailError);
+        
+        // Fallback: Dùng thông tin từ login response nếu có
+        if (response.data.user) {
+          console.log('🔄 Using fallback user info from login response');
+          userData = {
+            _id: response.data.user._id,
+            id: response.data.user._id,
+            fullName: response.data.user.fullName,
+            email: response.data.user.email,
+            role: response.data.user.role || (isManager ? 'manager' : 'user'),
+            avatar: '', // Không có avatar trong fallback
+            token: token
+          };
+        } else {
+          // Ultimate fallback: Dùng email để tạo ID
           const emailHash = Array.from(email)
             .reduce((hash, char) => ((hash << 5) - hash) + char.charCodeAt(0), 0)
             .toString(16);
           
           userData = {
-            _id: `user_${emailHash}`, // ID từ email
+            _id: `user_${emailHash}`,
             id: `user_${emailHash}`,
             fullName: email.split('@')[0],
             email: email,
             role: isManager ? 'manager' : 'user',
+            avatar: '',
             token: token,
             isEmailBasedId: true
           };
         }
       }
       
-      console.log('💾 Saving user data:', userData);
+      console.log('💾 Saving user data to localStorage:', userData);
       
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(userData));
@@ -132,7 +136,7 @@ export const AuthProvider = ({ children }) => {
       return { 
         success: true, 
         message: 'Đăng nhập thành công!',
-        user: userData // ← TRẢ VỀ user cho component
+        user: userData
       };
     } catch (error) {
       console.error('Login error details:', error);
@@ -209,7 +213,7 @@ export const AuthProvider = ({ children }) => {
       // Nếu có token, tự động login
       if (response.data.token) {
         // Tìm user theo email và đăng nhập
-        const loginResult = await login(email, '', false); // Password không cần vì đã có token
+        const loginResult = await login(email, '', false);
         return loginResult;
       }
       
@@ -240,7 +244,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Hàm kiểm tra có phải manager không (xử lý cả "manager" và "MANAGER")
+  // Hàm kiểm tra có phải manager không
   const checkIsManager = (role) => {
     if (!role) return false;
     return role.toUpperCase() === 'MANAGER';
@@ -249,14 +253,109 @@ export const AuthProvider = ({ children }) => {
   const hasPermission = (permission) => {
     if (!user) return false;
     
-    // Manager có tất cả quyền (xử lý cả "manager" và "MANAGER")
     if (checkIsManager(user.role)) return true;
     
-    // Admin có tất cả quyền (nếu có)
     if (user.role === 'admin') return true;
     
-    // User thông thường kiểm tra permissions
     return user.permissions?.includes(permission) || false;
+  };
+
+  // Thêm hàm updateUser để cập nhật thông tin user
+  const updateUser = async (updatedData) => {
+    try {
+      const { default: authService } = await import('../services/authService');
+      
+      const result = await authService.updateProfile(updatedData);
+      
+      if (!result.success) {
+        return result;
+      }
+      
+      // Cập nhật user trong state
+      const newUserData = { ...user, ...updatedData };
+      delete newUserData.avatarFile;
+      
+      localStorage.setItem('user', JSON.stringify(newUserData));
+      setUser(newUserData);
+      
+      return result;
+    } catch (error) {
+      console.error('Update user error:', error);
+      return { 
+        success: false, 
+        message: error.message || 'Có lỗi xảy ra khi cập nhật' 
+      };
+    }
+  };
+
+  // THÊM HÀM refreshUser để lấy thông tin mới nhất từ server
+  // const refreshUser = async () => {
+  //   try {
+  //     const token = localStorage.getItem('token');
+  //     if (!token) return null;
+      
+  //     const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  //     const isManager = checkIsManager(currentUser.role);
+      
+  //     const { default: axios } = await import('axios');
+      
+  //     const response = await axios.get(
+  //       isManager 
+  //         ? 'http://localhost:3370/api/v3/users/detail'
+  //         : 'http://localhost:3370/api/v1/users/detail',
+  //       {
+  //         headers: { 
+  //           Authorization: `Bearer ${token}`,
+  //           'Content-Type': 'application/json'
+  //         }
+  //       }
+  //     );
+      
+  //     if (response.data.code === 200 && response.data.info) {
+  //       const updatedUser = {
+  //         ...currentUser,
+  //         ...response.data.info,
+  //         _id: response.data.info._id,
+  //         id: response.data.info._id,
+  //         avatar: response.data.info.avatar || currentUser.avatar || '', // Giữ lại avatar nếu có
+  //         token: token
+  //       };
+        
+  //       localStorage.setItem('user', JSON.stringify(updatedUser));
+  //       setUser(updatedUser);
+  //       console.log('🔄 User refreshed, avatar:', updatedUser.avatar ? 'Yes' : 'No');
+  //       return updatedUser;
+  //     }
+  //   } catch (error) {
+  //     console.error('Refresh user error:', error);
+  //   }
+  //   return null;
+  // };
+
+  const fetchUserDetail = async () => {
+    try {
+      const { default: authService } = await import('../services/authService');
+      
+      const result = await authService.getProfile();
+      
+      if (result.success && result.data) {
+        const newUserData = {
+          ...user,
+          ...result.data,
+          _id: result.data._id,
+          id: result.data._id,
+          avatar: result.data.avatar || user?.avatar || '' // Giữ lại avatar
+        };
+        
+        localStorage.setItem('user', JSON.stringify(newUserData));
+        setUser(newUserData);
+        return { success: true, user: newUserData };
+      }
+      
+      return { success: false, message: result.message };
+    } catch (error) {
+      return { success: false, message: error.message };
+    }
   };
 
   const value = {
@@ -269,10 +368,12 @@ export const AuthProvider = ({ children }) => {
     verifyOTP,
     resetPassword,
     hasPermission,
-    // Thêm helper functions
+    updateUser,
+    fetchUserDetail,
+    
     isManager: () => {
       if (!user || !user.role) return false;
-      return checkIsManager(user.role);
+      return user.role.toUpperCase() === 'MANAGER';
     },
     getUserId: () => {
       return user?._id || user?.id;
