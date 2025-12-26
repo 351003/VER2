@@ -115,11 +115,11 @@ const Sidebar = ({ collapsed }) => {
         icon: <CalendarOutlined />,
         label: 'Lịch',
       },
-      {
-        key: '/personalreports',
-        icon: <BarChartOutlined />,
-        label: 'Báo Cáo Cá Nhân',
-      },
+      // {
+      //   key: '/personalreports',
+      //   icon: <BarChartOutlined />,
+      //   label: 'Báo Cáo Cá Nhân',
+      // },
     ];
   }
 
@@ -173,10 +173,10 @@ const Sidebar = ({ collapsed }) => {
           {isManager() && '👔 Quản lý'} {/* SỬA */}
           {!isManager() && user?.role === 'user' && '👤 Người dùng'}
         </div>
-        {/* Thêm debug info */}
+        {/* Thêm debug info
         <div style={{ fontSize: 9, color: '#ccc', marginTop: 2 }}>
           Role: {user?.role} | isManager: {isManager() ? '✅' : '❌'}
-        </div>
+        </div> */}
       </div>
       
       <Menu

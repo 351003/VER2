@@ -187,7 +187,7 @@ const TaskForm = ({
       <Form.Item
         name="timeFinish"
         label="Thời gian kết thúc"
-        rules={[{ validator: validateDates }]}
+        rules={[{required: true, validator: validateDates }]}
       >
         <DatePicker 
           style={{ width: '100%' }}
@@ -196,7 +196,7 @@ const TaskForm = ({
         />
       </Form.Item>
 
-      <Form.Item
+      {/* <Form.Item
         name="tags"
         label="Thẻ"
       >
@@ -206,7 +206,7 @@ const TaskForm = ({
           style={{ width: '100%' }}
           tokenSeparators={[',','']}
         />
-      </Form.Item>
+      </Form.Item> */}
 
       <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
         <Space>
