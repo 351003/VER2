@@ -259,7 +259,7 @@ const Teams = () => {
               <TeamOutlined style={{ marginRight: 12, color: '#1890ff' }} />
               Quản Lý Nhóm
             </Title>
-            <p style={{ margin: 0, color: '#666' }}>Tạo và quản lý các nhóm làm việc hợp tác</p>
+            <p style={{ margin: 0, color: '#666' }}>Danh sách nhóm của bạn</p>
           </div>
           <PermissionWrapper permission="create_team">
             <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalVisible(true)}>
@@ -273,13 +273,13 @@ const Teams = () => {
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={12} sm={6}><Card><Statistic title="Tổng số nhóm" value={stats.total} prefix={<TeamOutlined />} /></Card></Col>
         <Col xs={12} sm={6}><Card><Statistic title="Nhóm đang hoạt động" value={stats.active} valueStyle={{ color: '#52c41a' }} prefix={<TeamOutlined />} /></Card></Col>
-        <Col xs={12} sm={6}><Card><Statistic title="Nhóm riêng tư" value={stats.private} valueStyle={{ color: '#1890ff' }} prefix={<TeamOutlined />} /></Card></Col>
+        {/* <Col xs={12} sm={6}><Card><Statistic title="Nhóm riêng tư" value={stats.private} valueStyle={{ color: '#1890ff' }} prefix={<TeamOutlined />} /></Card></Col> */}
         <Col xs={12} sm={6}><Card><Statistic title="Tổng thành viên" value={stats.members} prefix={<UserOutlined />} /></Card></Col>
       </Row>
 
       {/* Filters */}
       <Card style={{ marginBottom: 16 }}>
-        <Tabs
+        {/* <Tabs
           activeKey={activeTab}
           onChange={setActiveTab}
           items={[
@@ -288,7 +288,7 @@ const Teams = () => {
             { key: 'private', label: `Riêng tư (${stats.private})` },
             { key: 'inactive', label: `Ngừng hoạt động (${teams.filter(t => !t.isActive).length})` }
           ]}
-        />
+        /> */}
         <Row gutter={[16, 16]} style={{ marginTop: 16 }} align="middle">
           <Col xs={24} md={8}>
             <Search placeholder="Tìm kiếm nhóm..." prefix={<SearchOutlined />} value={searchText} onChange={(e) => setSearchText(e.target.value)} allowClear />
