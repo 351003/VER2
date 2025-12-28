@@ -1,6 +1,7 @@
-// src/contexts/NotificationContext.jsx
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { notification as antdNotification } from 'antd';
+import { notificationService } from '../services/notificationService';
+import { io } from 'socket.io-client';
 
 const NotificationContext = createContext();
 
@@ -12,243 +13,266 @@ export const useNotifications = () => {
   return context;
 };
 
-// Mock data cho notifications
-const mockNotifications = [
-  {
-    _id: '1',
-    title: 'Công việc mới được giao',
-    message: 'Bạn được giao task "Thiết kế database cho hệ thống"',
-    type: 'task',
-    read: false,
-    createdAt: new Date(Date.now() - 5 * 60 * 1000),
-    link: '/tasks/1'
-  },
-  {
-    _id: '2',
-    title: 'Deadline sắp đến',
-    message: 'Task "Review code API" hết hạn trong 2 giờ',
-    type: 'deadline',
-    read: false,
-    createdAt: new Date(Date.now() - 30 * 60 * 1000),
-    link: '/tasks/2'
-  },
-  {
-    _id: '3',
-    title: 'Lời mời tham gia nhóm',
-    message: 'Bạn được Admin mời tham gia nhóm "Development Team"',
-    type: 'team',
-    read: true,
-    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
-    link: '/teams'
-  }
-];
-
 export const NotificationProvider = ({ children }) => {
-  const [notifications, setNotifications] = useState(mockNotifications);
+  const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [isConnected, setIsConnected] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [socket, setSocket] = useState(null);
 
-  // Tính unread count
-  useEffect(() => {
-    const unread = notifications.filter(noti => !noti.read).length;
-    setUnreadCount(unread);
-  }, [notifications]);
-
-  // Giả lập real-time notifications
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (Math.random() < 0.1) {
-        const newNotification = generateRandomNotification();
-        handleNewNotification(newNotification);
+  // Fetch notifications từ API thực
+  const fetchNotifications = useCallback(async (showNotification = false) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await notificationService.getNotifications();
+      
+      console.log('📢 Notification API Response:', response);
+      
+      if (response.code === 200 && response.data) {
+        // Format notifications theo cấu trúc backend
+        const notificationsData = Array.isArray(response.data) ? response.data : [];
+        
+        const formattedNotifications = notificationsData.map(noti => ({
+          _id: noti._id,
+          title: noti.title,
+          message: noti.message,
+          type: noti.type,
+          isRead: noti.isRead,
+          read: noti.isRead,
+          url: noti.url,
+          createdAt: noti.createdAt,
+          priority: noti.priority,
+          sender: noti.sender
+        }));
+        
+        console.log('📢 Formatted notifications:', formattedNotifications);
+        
+        // Kiểm tra xem có thông báo mới không
+        const previousUnreadCount = unreadCount;
+        const newUnreadCount = formattedNotifications.filter(n => !n.isRead).length;
+        
+        setNotifications(formattedNotifications);
+        setUnreadCount(newUnreadCount);
+        
+        // Hiển thị notification nếu có thông báo mới
+        if (showNotification && newUnreadCount > previousUnreadCount) {
+          const newNotifications = formattedNotifications.filter(n => !n.isRead);
+          const latestNotification = newNotifications[0];
+          
+          if (latestNotification) {
+            antdNotification.info({
+              message: latestNotification.title,
+              description: latestNotification.message,
+              duration: 4,
+              onClick: () => {
+                markAsRead(latestNotification._id);
+                if (latestNotification.url) {
+                  window.location.href = latestNotification.url;
+                }
+              }
+            });
+          }
+        }
       }
+    } catch (error) {
+      console.error('❌ Failed to fetch notifications:', error);
+      setError(error.message);
+      
+      antdNotification.error({
+        message: 'Lỗi tải thông báo',
+        description: error.message,
+        duration: 3
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [unreadCount]);
 
-      if (Math.random() < 0.05) {
-        showRandomDeadlineAlert();
-      }
-    }, 30000);
-
-    return () => clearInterval(interval);
+  // Khởi tạo WebSocket connection
+  useEffect(() => {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    
+    if (token && !socket) {
+      const newSocket = io('http://localhost:3370', {
+        auth: {
+          token: token
+        },
+        transports: ['websocket', 'polling']
+      });
+      
+      newSocket.on('connect', () => {
+        console.log('🔌 WebSocket connected');
+      });
+      
+      newSocket.on('new-notification', (notification) => {
+        console.log('🔔 New notification via WebSocket:', notification);
+        
+        // Thêm thông báo mới vào đầu danh sách
+        setNotifications(prev => [
+          {
+            _id: notification._id,
+            title: notification.title,
+            message: notification.message,
+            type: notification.type,
+            isRead: false,
+            read: false,
+            url: notification.url,
+            createdAt: notification.createdAt,
+            priority: notification.priority,
+            sender: notification.sender
+          },
+          ...prev
+        ]);
+        
+        // Tăng unread count
+        setUnreadCount(prev => prev + 1);
+        
+        // Hiển thị browser notification
+        if (Notification.permission === 'granted') {
+          new Notification(notification.title, {
+            body: notification.message,
+            icon: '/favicon.ico'
+          });
+        }
+        
+        // Hiển thị antd notification
+        antdNotification.info({
+          message: notification.title,
+          description: notification.message,
+          duration: 4,
+          onClick: () => {
+            markAsRead(notification._id);
+            if (notification.url) {
+              window.location.href = notification.url;
+            }
+          }
+        });
+      });
+      
+      newSocket.on('disconnect', () => {
+        console.log('🔌 WebSocket disconnected');
+      });
+      
+      setSocket(newSocket);
+      
+      return () => {
+        newSocket.disconnect();
+      };
+    }
   }, []);
 
-  const generateRandomNotification = () => {
-    const types = ['task', 'deadline', 'project', 'system', 'meeting', 'team', 'mention'];
-    const messages = {
-      task: [
-        'Bạn được giao task mới: "Thiết kế giao diện người dùng"',
-        'Có task mới cần review: "API Authentication"',
-        'Task "Database Optimization" đã được cập nhật'
-      ],
-      deadline: [
-        'Task "Frontend Development" hết hạn trong 3 giờ',
-        'Deadline "Project Documentation" sắp đến',
-        'Công việc "Testing" cần hoàn thành trước 17:00'
-      ],
-      project: [
-        'Dự án mới "Mobile App" đã được tạo',
-        'Project "Web Platform" có 5 task chưa hoàn thành',
-        'Thành viên mới đã tham gia dự án'
-      ],
-      system: [
-        'Hệ thống sẽ nâng cấp vào cuối tuần',
-        'Bảo trì định kỳ: 02:00 - 04:00 AM',
-        'Cập nhật phiên bản mới có sẵn'
-      ],
-      meeting: [
-        'Cuộc họp sprint planning sau 1 giờ',
-        'Daily meeting bắt đầu sau 10 phút',
-        'Review meeting lúc 14:00 chiều nay'
-      ],
-      team: [
-        'Bạn được mời tham gia nhóm "Frontend Development"',
-        'Bạn đã được thêm vào nhóm "Backend Team"',
-        'Nhóm "Design Team" có thành viên mới tham gia'
-      ],
-      mention: [
-        'Admin đã nhắc đến bạn trong một bình luận',
-        'Manager đã đề cập đến bạn trong task review',
-        'Bạn được nhắc đến trong cuộc thảo luận về dự án'
-      ]
-    };
-
-    const type = types[Math.floor(Math.random() * types.length)];
-    const messageList = messages[type];
-    const message = messageList ? messageList[Math.floor(Math.random() * messageList.length)] : 'Thông báo mới';
-
-    return {
-      _id: Date.now().toString(),
-      title: getNotificationTitle(type),
-      message: message,
-      type: type,
-      read: false,
-      createdAt: new Date(),
-      link: `/${type}s/1`
-    };
-  };
-
-  const getNotificationTitle = (type) => {
-    const titles = {
-      task: 'Công việc mới',
-      deadline: 'Cảnh báo deadline',
-      project: 'Cập nhật dự án',
-      system: 'Thông báo hệ thống',
-      meeting: 'Nhắc nhở họp',
-      team: 'Lời mời tham gia nhóm',
-      mention: 'Bạn được nhắc đến'
-    };
-    return titles[type] || 'Thông báo';
-  };
-
-  // SỬA LỖI: Đảm bảo luôn sử dụng antdNotification
-  const handleNewNotification = (newNotification) => {
-    setNotifications(prev => [newNotification, ...prev]);
+  // Load notifications on mount và polling
+  useEffect(() => {
+    fetchNotifications();
     
-    // Sử dụng antdNotification thay vì notification
-    showNotificationToast(newNotification);
+    // Poll for new notifications every 10 seconds (nhanh hơn)
+    const interval = setInterval(() => {
+      fetchNotifications(true); // true = hiển thị notification khi có mới
+    }, 10000);
     
-    // Gửi push notification nếu browser hỗ trợ
-    if ('Notification' in window && Notification.permission === 'granted') {
-      showPushNotification(newNotification);
-    }
-  };
-
-  // SỬA LỖI: Sử dụng antdNotification thay vì notification
-  const showNotificationToast = (notificationItem) => {
-    const config = {
-      message: notificationItem.title,
-      description: notificationItem.message,
-      duration: 4,
-      placement: 'topRight'
+    return () => {
+      clearInterval(interval);
     };
+  }, [fetchNotifications]);
 
-    // Sử dụng antdNotification thay vì notification
-    switch (notificationItem.type) {
-      case 'deadline':
-        antdNotification.warning(config);
-        break;
-      case 'task':
-        antdNotification.info(config);
-        break;
-      case 'meeting':
-        antdNotification.success(config);
-        break;
-      case 'system':
-        antdNotification.info(config);
-        break;
-      case 'team':
-        antdNotification.success(config);
-        break;
-      case 'mention':
-        antdNotification.info(config);
-        break;
-      default:
-        antdNotification.success(config);
-    }
-  };
-
-  // SỬA LỖI: Sử dụng antdNotification thay vì notification
-  const showRandomDeadlineAlert = () => {
-    const tasks = [
-      'Thiết kế UI/UX',
-      'Phát triển API',
-      'Viết documentation',
-      'Testing',
-      'Deployment'
-    ];
-    const task = tasks[Math.floor(Math.random() * tasks.length)];
-    const times = ['30 phút', '1 giờ', '2 giờ', '3 giờ'];
-    const time = times[Math.floor(Math.random() * times.length)];
-
-    antdNotification.warning({
-      message: '⏰ Cảnh báo Deadline',
-      description: `Task "${task}" hết hạn trong ${time}`,
-      duration: 6,
-      placement: 'topRight'
-    });
-  };
-
-  const showPushNotification = (notificationItem) => {
-    if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification(notificationItem.title, {
-        body: notificationItem.message,
-        icon: '/vite.svg',
-        tag: notificationItem.type
+  // Mark as read
+  const markAsRead = async (notificationId) => {
+    try {
+      const result = await notificationService.markAsRead(notificationId);
+      
+      if (result.code === 200) {
+        setNotifications(prev => 
+          prev.map(noti => 
+            noti._id === notificationId 
+              ? { ...noti, isRead: true, read: true }
+              : noti
+          )
+        );
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (error) {
+      console.error('Failed to mark as read:', error);
+      antdNotification.error({
+        message: 'Lỗi đánh dấu đã đọc',
+        description: error.message,
+        duration: 3
       });
     }
   };
 
-  const markAsRead = async (notificationId) => {
-    setNotifications(prev =>
-      prev.map(noti =>
-        noti._id === notificationId ? { ...noti, read: true } : noti
-      )
-    );
-    
-    antdNotification.success({
-      message: 'Đã đánh dấu là đã đọc',
-      duration: 2
-    });
-  };
-
+  // Mark all as read
   const markAllAsRead = async () => {
-    setNotifications(prev =>
-      prev.map(noti => ({ ...noti, read: true }))
-    );
-    
-    antdNotification.success({
-      message: 'Đã đánh dấu tất cả là đã đọc',
-      duration: 2
-    });
+    try {
+      const unreadNotifications = notifications.filter(n => !n.isRead);
+      
+      if (unreadNotifications.length === 0) {
+        antdNotification.info({
+          message: 'Không có thông báo chưa đọc',
+          duration: 2
+        });
+        return;
+      }
+      
+      // Gọi API markAsRead cho từng notification chưa đọc
+      const promises = unreadNotifications.map(noti => 
+        notificationService.markAsRead(noti._id)
+      );
+      
+      await Promise.all(promises);
+      
+      setNotifications(prev => 
+        prev.map(noti => ({ ...noti, isRead: true, read: true }))
+      );
+      setUnreadCount(0);
+      
+      antdNotification.success({
+        message: `Đã đánh dấu ${unreadNotifications.length} thông báo là đã đọc`,
+        duration: 2
+      });
+    } catch (error) {
+      console.error('Failed to mark all as read:', error);
+      antdNotification.error({
+        message: 'Lỗi đánh dấu tất cả đã đọc',
+        description: error.message,
+        duration: 3
+      });
+    }
   };
 
+  // Delete notification
   const deleteNotification = async (notificationId) => {
-    setNotifications(prev => prev.filter(noti => noti._id !== notificationId));
-    
-    antdNotification.success({
-      message: 'Đã xóa thông báo',
-      duration: 2
-    });
+    try {
+      const result = await notificationService.deleteNotification(notificationId);
+      
+      if (result.code === 200) {
+        const deletedNoti = notifications.find(n => n._id === notificationId);
+        
+        setNotifications(prev => 
+          prev.filter(noti => noti._id !== notificationId)
+        );
+        
+        // Update unread count if notification was unread
+        if (deletedNoti && !deletedNoti.isRead) {
+          setUnreadCount(prev => Math.max(0, prev - 1));
+        }
+        
+        antdNotification.success({
+          message: 'Đã xóa thông báo',
+          duration: 2
+        });
+      }
+    } catch (error) {
+      console.error('Failed to delete notification:', error);
+      antdNotification.error({
+        message: 'Lỗi xóa thông báo',
+        description: error.message,
+        duration: 3
+      });
+    }
   };
 
+  // Request push permission
   const requestPushPermission = async () => {
     if (!('Notification' in window)) {
       antdNotification.warning({
@@ -280,91 +304,16 @@ export const NotificationProvider = ({ children }) => {
     return false;
   };
 
-  // Giả lập gửi email reminder
-  const sendEmailReminder = async (taskData) => {
-    antdNotification.info({
-      message: '📧 Email Reminder Sent',
-      description: `Email nhắc nhở đã được gửi cho task "${taskData.title}"`,
-      duration: 3
-    });
-    
-    return new Promise(resolve => setTimeout(resolve, 1000));
-  };
-
-  // Giả lập test notification
-  const testNotification = async (type = 'task') => {
-    const testNoti = generateRandomNotification();
-    testNoti.type = type;
-    handleNewNotification(testNoti);
-  };
-
-  // Thêm các hàm thông báo mới
-  const notifyTeamInvitation = async (teamName, invitedBy) => {
-    const teamNotification = {
-      _id: `team-${Date.now()}`,
-      title: 'Lời mời tham gia nhóm',
-      message: `Bạn được ${invitedBy} mời tham gia nhóm "${teamName}"`,
-      type: 'team',
-      read: false,
-      createdAt: new Date(),
-      link: '/teams'
-    };
-    handleNewNotification(teamNotification);
-  };
-
-  const notifyProjectAssignment = async (projectName, assignedBy) => {
-    const projectNotification = {
-      _id: `project-${Date.now()}`,
-      title: 'Được thêm vào dự án',
-      message: `Bạn được ${assignedBy} thêm vào dự án "${projectName}"`,
-      type: 'project',
-      read: false,
-      createdAt: new Date(),
-      link: '/projects'
-    };
-    handleNewNotification(projectNotification);
-  };
-
-  const notifyTaskAssignment = async (taskTitle, assignedBy) => {
-    const taskNotification = {
-      _id: `task-${Date.now()}`,
-      title: 'Công việc mới',
-      message: `Bạn được ${assignedBy} giao task "${taskTitle}"`,
-      type: 'task',
-      read: false,
-      createdAt: new Date(),
-      link: '/tasks'
-    };
-    handleNewNotification(taskNotification);
-  };
-
-  const notifyMention = async (mentionedBy, context, link) => {
-    const mentionNotification = {
-      _id: `mention-${Date.now()}`,
-      title: 'Bạn được nhắc đến',
-      message: `${mentionedBy} đã nhắc đến bạn trong ${context}`,
-      type: 'mention',
-      read: false,
-      createdAt: new Date(),
-      link: link
-    };
-    handleNewNotification(mentionNotification);
-  };
-
   const value = {
     notifications,
     unreadCount,
-    isConnected,
+    loading,
+    error,
+    fetchNotifications,
     markAsRead,
     markAllAsRead,
     deleteNotification,
     requestPushPermission,
-    sendEmailReminder,
-    testNotification,
-    notifyTeamInvitation,
-    notifyProjectAssignment,
-    notifyTaskAssignment,
-    notifyMention
   };
 
   return (

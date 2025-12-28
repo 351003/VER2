@@ -1,22 +1,29 @@
-// src/components/Notifications/NotificationBell.jsx
 import React, { useState } from 'react';
 import { Badge, Dropdown, Button, Tooltip } from 'antd';
 import { BellOutlined } from '@ant-design/icons';
 import NotificationList from './NotificationList';
+import { useNotifications } from '../../contexts/NotificationContext';
 
 const NotificationBell = () => {
   const [dropdownVisible, setDropdownVisible] = useState(false);
+  const { unreadCount, fetchNotifications, loading } = useNotifications();
 
   const handleBellClick = () => {
-    setDropdownVisible(!dropdownVisible);
+    const newVisible = !dropdownVisible;
+    setDropdownVisible(newVisible);
+    
+    // Luôn refresh khi mở dropdown
+    if (newVisible && !loading) {
+      fetchNotifications();
+    }
   };
 
+  console.log('🔔 NotificationBell: unreadCount =', unreadCount);
+
   const notificationDropdown = (
-    <div style={{ width: 400 }}>
-      <NotificationList 
-        onClose={() => setDropdownVisible(false)}
-      />
-    </div>
+    <NotificationList 
+      onClose={() => setDropdownVisible(false)}
+    />
   );
 
   return (
@@ -28,13 +35,15 @@ const NotificationBell = () => {
       placement="bottomRight"
       overlayStyle={{ 
         boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
-        borderRadius: 8
+        borderRadius: 8,
+        maxWidth: '90vw' // Responsive
       }}
     >
       <Tooltip title="Thông báo">
         <Badge 
-          count={5} 
+          count={unreadCount} 
           size="small" 
+          overflowCount={99}
           offset={[-5, 5]}
           style={{ 
             cursor: 'pointer',

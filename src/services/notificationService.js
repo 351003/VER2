@@ -1,109 +1,49 @@
-// src/services/notificationService.js
-import api from './api';
+// import { apiClientV1 } from './api';
 
-// REAL SERVICE
-export const notificationService = {
-  getNotifications: async (params = {}) => {
-    const response = await api.get('/notifications', { params });
-    return response.data;
-  },
-
-  markAsRead: async (notificationId) => {
-    const response = await api.patch(`/notifications/${notificationId}/read`);
-    return response.data;
-  },
-
-  markAllAsRead: async () => {
-    const response = await api.patch('/notifications/read-all');
-    return response.data;
-  },
-
-  deleteNotification: async (notificationId) => {
-    const response = await api.delete(`/notifications/${notificationId}`);
-    return response.data;
-  }
-};
-
-// MOCK SERVICE
-// export const mockNotificationService = {
+// export const notificationService = {
 //   getNotifications: async (params = {}) => {
-//     await new Promise(resolve => setTimeout(resolve, 600));
-    
-//     const mockNotifications = [
-//       {
-//         _id: "1",
-//         title: "Công việc mới",
-//         message: "Bạn được giao task 'Thiết kế database schema'",
-//         type: "task",
-//         read: false,
-//         data: { taskId: "1" },
-//         link: "/tasks/1",
-//         createdAt: new Date(Date.now() - 5 * 60 * 1000).toISOString()
-//       },
-//       {
-//         _id: "2",
-//         title: "Deadline sắp đến",
-//         message: "Task 'Implement authentication API' hết hạn trong 2 ngày",
-//         type: "deadline",
-//         read: false,
-//         data: { taskId: "2" },
-//         link: "/tasks/2",
-//         createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
-//       },
-//       {
-//         _id: "3",
-//         title: "Thêm vào dự án",
-//         message: "Bạn được thêm vào dự án 'Website Redesign'",
-//         type: "project",
-//         read: true,
-//         data: { projectId: "1" },
-//         link: "/projects/1",
-//         createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-//       }
-//     ];
-
-//     let filteredNotifications = mockNotifications;
-//     if (params.unreadOnly === 'true') {
-//       filteredNotifications = filteredNotifications.filter(noti => !noti.read);
-//     }
-
-//     return {
-//       notifications: filteredNotifications,
-//       pagination: {
-//         page: 1,
-//         limit: 20,
-//         total: filteredNotifications.length,
-//         pages: 1
-//       },
-//       unreadCount: filteredNotifications.filter(noti => !noti.read).length
-//     };
+//     const response = await apiClientV1.get('/notifications', { params });
+//     return response; // Trả về toàn bộ response
 //   },
 
 //   markAsRead: async (notificationId) => {
-//     await new Promise(resolve => setTimeout(resolve, 300));
-    
-//     return {
-//       message: "Notification marked as read",
-//       notification: {
-//         _id: notificationId,
-//         read: true
-//       }
-//     };
+//     const response = await apiClientV1.patch(`/notifications/isReaded/${notificationId}`);
+//     return response;
 //   },
 
 //   markAllAsRead: async () => {
-//     await new Promise(resolve => setTimeout(resolve, 300));
+//     const response = await notificationService.getNotifications();
+//     const unreadNotifications = response.data.filter(n => !n.isRead);
     
-//     return {
-//       message: "All notifications marked as read"
-//     };
+//     const promises = unreadNotifications.map(noti => 
+//       notificationService.markAsRead(noti._id)
+//     );
+    
+//     await Promise.all(promises);
+    
+//     return { success: true };
 //   },
 
 //   deleteNotification: async (notificationId) => {
-//     await new Promise(resolve => setTimeout(resolve, 300));
-    
-//     return {
-//       message: "Notification deleted successfully"
-//     };
+//     const response = await apiClientV1.patch(`/notifications/delete/${notificationId}`);
+//     return response;
 //   }
 // };
+import { apiClientV1 } from './api';
+
+export const notificationService = {
+  getNotifications: async (params = {}) => {
+    const response = await apiClientV1.get('/notifications', { params });
+    return response;
+  },
+
+  markAsRead: async (notificationId) => {
+    const response = await apiClientV1.patch(`/notifications/isReaded/${notificationId}`);
+    return response;
+  },
+
+  deleteNotification: async (notificationId) => {
+    const response = await apiClientV1.patch(`/notifications/delete/${notificationId}`);
+    return response;
+  }
+};
