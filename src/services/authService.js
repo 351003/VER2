@@ -31,14 +31,14 @@ const createApiClient = (baseURL) => {
     (error) => {
       // Xử lý lỗi 401 (unauthorized)
       if (error.response?.status === 401) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        // localStorage.removeItem('token');
+        // localStorage.removeItem('user');
         // Chỉ redirect nếu không phải trang auth
         const currentPath = window.location.pathname;
         if (!currentPath.includes('/login') && 
             !currentPath.includes('/register') &&
             !currentPath.includes('/forgot-password')) {
-          window.location.href = '/login';
+       
         }
       }
       return Promise.reject(error);

@@ -29,9 +29,7 @@ apiClient.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      sessionStorage.removeItem('token');
-      window.location.href = '/login';
+
     }
     throw error.response?.data || error;
   }

@@ -163,18 +163,18 @@ export const NotificationProvider = ({ children }) => {
   }, []);
 
   // Load notifications on mount và polling
-  useEffect(() => {
-    fetchNotifications();
+  // useEffect(() => {
+  //   fetchNotifications();
     
-    // Poll for new notifications every 10 seconds (nhanh hơn)
-    const interval = setInterval(() => {
-      fetchNotifications(true); // true = hiển thị notification khi có mới
-    }, 10000);
+  //   // Poll for new notifications every 10 seconds (nhanh hơn)
+  //   const interval = setInterval(() => {
+  //     fetchNotifications(true); // true = hiển thị notification khi có mới
+  //   }, 10000);
     
-    return () => {
-      clearInterval(interval);
-    };
-  }, [fetchNotifications]);
+  //   return () => {
+  //     clearInterval(interval);
+  //   };
+  // }, [fetchNotifications]);
 
   // Mark as read
   const markAsRead = async (notificationId) => {
