@@ -13,7 +13,7 @@ const createApiClient = (baseURL) => {
   // Request interceptor để thêm token
   instance.interceptors.request.use(
     (config) => {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('tokenLogin') || sessionStorage.getItem('tokenLogin');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
@@ -152,7 +152,7 @@ const authService = {
 
   // ========== UTILITIES ==========
   getAuthHeaders() {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('tokenLogin') || sessionStorage.getItem('tokenLogin');
     return token ? { Authorization: `Bearer ${token}` } : {};
   },
 
