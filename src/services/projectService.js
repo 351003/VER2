@@ -115,7 +115,7 @@ export const getProjectDetail = async (id) => {
   return {
     success: response?.code === 200 || response?.success === true,
     data: response?.data || response,
-    comments: response?.comment || [],
+    comments: response?.comments || [],
   };
 };
 
