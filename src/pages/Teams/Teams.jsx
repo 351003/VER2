@@ -411,20 +411,8 @@ const Teams = () => {
       </Modal>
 
       {/* Team Chat Drawer */}
-      <Drawer 
-        title={`Team Chat - ${selectedTeam?.name}`} 
-        placement="right" 
-        onClose={() => setChatDrawerVisible(false)} 
-        open={chatDrawerVisible} 
-        width={500}
-      >
-        {selectedTeam && (
-          <TeamChat 
-            team={selectedTeam} 
-            currentUser={user} 
-            onClose={() => setChatDrawerVisible(false)} 
-          />
-        )}
+      <Drawer title={`Team Chat - ${selectedTeam?.name}`} placement="right" onClose={() => setChatDrawerVisible(false)} open={chatDrawerVisible} width={500}>
+        {selectedTeam && <TeamChat team={selectedTeam} currentUser={{...user, id: user._id || user.id}} onClose={() => setChatDrawerVisible(false)} />}
       </Drawer>
     </div>
   );
