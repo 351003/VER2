@@ -246,7 +246,7 @@ const Teams = () => {
     active: teams.filter(t => t.isActive).length,
     inactive: teams.filter(t => !t.isActive).length
   };
-
+  
   return (
     <div>
       <Card style={{ marginBottom: 16 }}>

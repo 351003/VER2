@@ -27,15 +27,13 @@ const TeamChat = ({ team, currentUser, onClose }) => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  // ✅ Load history từ backend (v1)
+  // ✅ Load history từ backend (v1) - Đã sửa team.id -> team._id
   const fetchMessages = useCallback(async () => {
     try {
       const token = localStorage.getItem(STORAGE_TOKEN_KEY) || sessionStorage.getItem(STORAGE_TOKEN_KEY);
-      if (!token) return; // chưa login thì thôi
+      if (!token) return;
 
-      // Bạn cần backend có endpoint trả JSON. Ví dụ:
-      // GET /api/v1/chat/history?teamId=...
-      const res = await fetch(`${API_BASE}/api/v1/chat/history?teamId=${team.id}`, {
+      const res = await fetch(`${API_BASE}/api/v1/chat/history?teamId=${team._id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -46,7 +44,6 @@ const TeamChat = ({ team, currentUser, onClose }) => {
 
       const data = await res.json();
 
-      // data = { success: true, data: [...] }
       const formatted = (data?.data || []).map((chat) => ({
         id: chat._id,
         content: chat.content,
@@ -64,34 +61,33 @@ const TeamChat = ({ team, currentUser, onClose }) => {
     } catch (err) {
       console.error("Error fetching messages:", err);
     }
-  }, [team.id]);
+  }, [team._id]);
 
   useEffect(() => {
-    const token = localStorage.getItem(STORAGE_TOKEN_KEY) || sessionStorage.getItem(STORAGE_TOKEN_KEY);
-    if (!token || !currentUser?.id) return;
-    const s = io(SOCKET_URL, {
-      transports: ["websocket", "polling"],
-      auth: { token },
-      query: { userId: currentUser.id, teamId: team.id },
-    });
+   const token = localStorage.getItem(STORAGE_TOKEN_KEY) || sessionStorage.getItem(STORAGE_TOKEN_KEY);
+  console.log("🔑 Token gửi lên Socket:", token); // THÊM LOG NÀY
+
+  const s = io(SOCKET_URL, {
+    transports: ["websocket"],
+    auth: { token }, // Gửi token vào đây
+    query: { userId: currentUser.id, teamId: team._id },
+  });
 
     socketRef.current = s;
 
     s.on("connect", () => {
-      console.log("✅ Socket connected:", s.id);
-      // nếu backend có room theo team:
-      s.emit("JOIN_ROOM", { roomId: `team_${team.id}` });
+      console.log("✅ Socket connected for team:", team._id);
+      // Đã sửa roomId: team.id -> team._id
+      s.emit("JOIN_ROOM", { roomId: `team_${team._id}` });
     });
 
     s.on("connect_error", (err) => {
       console.error("❌ Socket connect_error:", err.message);
       antdMsg.error(err.message || "Socket connect failed");
     });
-    s.on("SERVER_RETURN_MESSAGE", (data) => {
-      console.log("📥 SERVER_RETURN_MESSAGE:", data);
 
+    s.on("SERVER_RETURN_MESSAGE", (data) => {
       setMessages((prev) => {
-        // nếu server trả tempId → thay message tạm bằng message thật
         if (data?.tempId) {
           const idx = prev.findIndex((m) => m._tempId === data.tempId);
           if (idx !== -1) {
@@ -108,7 +104,6 @@ const TeamChat = ({ team, currentUser, onClose }) => {
           }
         }
 
-        // fallback add new
         return [
           ...prev,
           {
@@ -123,10 +118,7 @@ const TeamChat = ({ team, currentUser, onClose }) => {
       });
     });
 
-
-    // typing
     s.on("SERVER_RETURN_TYPING", (data) => {
-      // data: { userId, fullName, type }
       if (!data?.userId || String(data.userId) === String(currentUser.id)) return;
 
       if (data.type === "typing") {
@@ -136,7 +128,6 @@ const TeamChat = ({ team, currentUser, onClose }) => {
           return [...prev, { userId: data.userId, fullName: data.fullName }];
         });
 
-        // auto remove after 3s
         setTimeout(() => {
           setTypingUsers((prev) => prev.filter((u) => String(u.userId) !== String(data.userId)));
         }, 3000);
@@ -145,27 +136,32 @@ const TeamChat = ({ team, currentUser, onClose }) => {
       }
     });
 
-    // load lịch sử khi mở chat
     fetchMessages();
 
     return () => {
       try {
-        s.emit("LEAVE_ROOM", { roomId: `team_${team.id}` });
+        // Đã sửa roomId: team.id -> team._id
+        s.emit("LEAVE_ROOM", { roomId: `team_${team._id}` });
       } catch { }
       s.disconnect();
       socketRef.current = null;
     };
-  }, [team.id, currentUser?.id, fetchMessages]);
+  }, [team._id, currentUser?.id, fetchMessages]);
 
   const handleSendMessage = () => {
     const s = socketRef.current;
     const text = newMessage.trim();
+     console.log(">>> Kiểm tra trước khi gửi:", { 
+    socketConnected: s?.connected, 
+    socketId: s?.id,
+    text: text 
+  });
+  if (!text || !s?.connected) {
+    console.error(">>> Gửi thất bại: Socket chưa connect hoặc tin nhắn rỗng");
+    return;
+  }
+    // if (!text || !s?.connected) return;
 
-    console.log("📤 SEND:", { text, connected: s?.connected, socketId: s?.id });
-
-    if (!text || !s?.connected) return;
-
-    // ✅ 1) Optimistic: hiện ngay trên UI
     const tempId = `temp_${Date.now()}`;
     setMessages((prev) => [
       ...prev,
@@ -184,13 +180,13 @@ const TeamChat = ({ team, currentUser, onClose }) => {
       },
     ]);
 
-    // ✅ 2) emit lên server kèm tempId để dedupe
+    // Đã sửa các trường teamId, room_chat_id, roomId: team.id -> team._id
     s.emit("CLIENT_SEND_MESSAGE", {
       content: text,
       images: [],
-      teamId: team.id, // phải là ObjectId string
-      room_chat_id: team.id,
-      roomId: `team_${team.id}`,
+      teamId: team._id,
+      room_chat_id: team._id,
+      roomId: `team_${team._id}`,
       tempId,
     });
 
@@ -199,17 +195,12 @@ const TeamChat = ({ team, currentUser, onClose }) => {
 
   const isComposingRef = useRef(false);
   const handlePressEnter = (e) => {
-    // Nếu đang gõ tiếng Việt (IME) thì bỏ qua
     if (isComposingRef.current) return;
-
-    // Shift+Enter thì xuống dòng
     if (e.shiftKey) return;
-
     e.preventDefault();
     handleSendMessage();
   };
 
-  // typing handler (debounce)
   const handleTyping = (e) => {
     const value = e.target.value;
     setNewMessage(value);
@@ -217,7 +208,7 @@ const TeamChat = ({ team, currentUser, onClose }) => {
     const s = socketRef.current;
     if (!s?.connected) return;
 
-    s.emit("CLIENT_SEND_TYPING", "typing"); // ✅ backend của bạn đang nhận (type) là string
+    s.emit("CLIENT_SEND_TYPING", "typing");
 
     clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => {
@@ -234,11 +225,12 @@ const TeamChat = ({ team, currentUser, onClose }) => {
       const reader = new FileReader();
       reader.onload = (event) => {
         const buffer = event.target.result;
+        // Đã sửa teamId, room_chat_id: team.id -> team._id
         s.emit("CLIENT_SEND_MESSAGE", {
           content: "",
           images: [buffer],
-          room_chat_id: team.id,
-          teamId: team.id,
+          room_chat_id: team._id,
+          teamId: team._id,
         });
       };
       reader.readAsArrayBuffer(file);
