@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   List,
   Button,
@@ -9,10 +9,9 @@ import {
   Typography,
   Spin,
   Alert,
-  notification as antdNotification,
   Row,
-  Col
-} from 'antd';
+  Col,
+} from "antd";
 import {
   CheckOutlined,
   DeleteOutlined,
@@ -21,10 +20,10 @@ import {
   ExclamationCircleOutlined,
   TeamOutlined,
   MessageOutlined,
-  ReloadOutlined
-} from '@ant-design/icons';
-import { useNotifications } from '../../contexts/NotificationContext';
-import { useNavigate } from 'react-router-dom';
+  ReloadOutlined,
+} from "@ant-design/icons";
+import { useNotifications } from "../../contexts/NotificationContext";
+import { useNavigate } from "react-router-dom";
 
 const { Text, Title } = Typography;
 
@@ -37,64 +36,67 @@ const NotificationList = ({ onClose }) => {
     fetchNotifications,
     markAsRead,
     markAllAsRead,
-    deleteNotification
+    deleteNotification,
   } = useNotifications();
-  
+
   const navigate = useNavigate();
 
   const getNotificationIcon = (type) => {
     const icons = {
-      task: <CheckCircleOutlined style={{ color: '#1890ff' }} />,
-      system: <MessageOutlined style={{ color: '#722ed1' }} />,
-      comment: <MessageOutlined style={{ color: '#52c41a' }} />,
-      chat: <MessageOutlined style={{ color: '#eb2f96' }} />,
-      project: <TeamOutlined style={{ color: '#52c41a' }} />,
-      deadline: <ClockCircleOutlined style={{ color: '#faad14' }} />,
-      urgent: <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />,
-      meeting: <TeamOutlined style={{ color: '#eb2f96' }} />,
-      create_project: <TeamOutlined style={{ color: '#52c41a' }} />,
-      project_update: <TeamOutlined style={{ color: '#1890ff' }} />,
-      project_delete: <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />
+      TASK: <CheckCircleOutlined style={{ color: "#1890ff" }} />,
+      PROJECT: <TeamOutlined style={{ color: "#52c41a" }} />,
+      CREATE_PROJECT: <TeamOutlined style={{ color: "#52c41a" }} />,
+      SYSTEM: <MessageOutlined style={{ color: "#722ed1" }} />,
+      COMMENT: <MessageOutlined style={{ color: "#52c41a" }} />,
+      CHAT: <MessageOutlined style={{ color: "#eb2f96" }} />,
+      DEADLINE: <ClockCircleOutlined style={{ color: "#faad14" }} />,
+      URGENT: <ExclamationCircleOutlined style={{ color: "#ff4d4f" }} />,
+      MEETING: <TeamOutlined style={{ color: "#eb2f96" }} />,
+      PROJECT_UPDATE: <TeamOutlined style={{ color: "#1890ff" }} />,
+      PROJECT_DELETE: (
+        <ExclamationCircleOutlined style={{ color: "#ff4d4f" }} />
+      ),
     };
-    return icons[type?.toLowerCase()] || <MessageOutlined />;
+    return icons[type] || <MessageOutlined />;
   };
 
   const getNotificationColor = (type) => {
     const colors = {
-      task: 'blue',
-      system: 'purple',
-      comment: 'green',
-      chat: 'pink',
-      project: 'green',
-      deadline: 'orange',
-      urgent: 'red',
-      meeting: 'cyan',
-      create_project: 'green',
-      project_update: 'blue',
-      project_delete: 'red'
+      TASK: "blue",
+      PROJECT: "green",
+      CREATE_PROJECT: "green",
+      SYSTEM: "purple",
+      COMMENT: "green",
+      CHAT: "pink",
+      DEADLINE: "orange",
+      URGENT: "red",
+      MEETING: "cyan",
+      PROJECT_UPDATE: "blue",
+      PROJECT_DELETE: "red",
     };
-    return colors[type?.toLowerCase()] || 'default';
+    return colors[type] || "default";
   };
 
   const formatTime = (timestamp) => {
-    if (!timestamp) return 'Vừa xong';
-    
+    if (!timestamp) return "Vừa xong";
+
     try {
       const now = new Date();
       const time = new Date(timestamp);
-      
+
       if (isNaN(time.getTime())) {
-        return 'Vừa xong';
+        return "Vừa xong";
       }
-      
+
       const diffInMinutes = Math.floor((now - time) / (1000 * 60));
-      
-      if (diffInMinutes < 1) return 'Vừa xong';
+
+      if (diffInMinutes < 1) return "Vừa xong";
       if (diffInMinutes < 60) return `${diffInMinutes} phút trước`;
-      if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)} giờ trước`;
+      if (diffInMinutes < 1440)
+        return `${Math.floor(diffInMinutes / 60)} giờ trước`;
       return `${Math.floor(diffInMinutes / 1440)} ngày trước`;
     } catch (error) {
-      return 'Vừa xong';
+      return "Vừa xong";
     }
   };
 
@@ -104,16 +106,20 @@ const NotificationList = ({ onClose }) => {
       if (!notification.isRead) {
         await markAsRead(notification._id);
       }
-      
+
       // Đóng dropdown
       if (onClose) onClose();
-      
+
       // Chuyển hướng nếu có URL
-      if (notification.url && notification.url !== '#' && notification.url !== 'null') {
+      if (
+        notification.url &&
+        notification.url !== "#" &&
+        notification.url !== "null"
+      ) {
         navigate(notification.url);
       }
     } catch (error) {
-      // Error đã được handle trong context
+      console.error("Error handling notification click:", error);
     }
   };
 
@@ -121,7 +127,7 @@ const NotificationList = ({ onClose }) => {
     try {
       await markAllAsRead();
     } catch (error) {
-      // Error đã được handle trong context
+      console.error("Error marking all as read:", error);
     }
   };
 
@@ -130,56 +136,62 @@ const NotificationList = ({ onClose }) => {
   };
 
   return (
-    <div style={{ 
-      background: 'white', 
-      borderRadius: 8, 
-      width: 400,
-      maxWidth: '90vw' // Responsive cho mobile
-    }}>
+    <div
+      style={{
+        background: "white",
+        borderRadius: 8,
+        width: 400,
+        maxWidth: "90vw",
+      }}
+    >
       {/* Header */}
-      <div style={{ 
-        padding: '16px', 
-        borderBottom: '1px solid #f0f0f0',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <Title level={5} style={{ margin: 0 }}>Thông báo</Title>
+      <div
+        style={{
+          padding: "16px",
+          borderBottom: "1px solid #f0f0f0",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <Title level={5} style={{ margin: 0 }}>
+          Thông báo
+        </Title>
         <Space>
           {loading && <Spin size="small" />}
-          {error && (
-            <Button 
-              type="link" 
-              size="small" 
-              icon={<ReloadOutlined />}
-              onClick={handleRetry}
-              title="Thử lại"
-            />
-          )}
-          {!loading && !error && unreadCount > 0 && (
-            <Button 
-              type="link" 
-              size="small" 
+          {!loading && unreadCount > 0 && (
+            <Button
+              type="link"
+              size="small"
               onClick={handleMarkAllAsRead}
               style={{ padding: 0, fontSize: 12 }}
+              loading={loading}
             >
               Đánh dấu tất cả đã đọc
             </Button>
           )}
+          <Button
+            type="link"
+            size="small"
+            icon={<ReloadOutlined />}
+            onClick={handleRetry}
+            title="Tải lại"
+            loading={loading}
+          />
         </Space>
       </div>
 
       {/* Notifications List */}
-      <div style={{ maxHeight: 400, overflow: 'auto' }}>
+      <div style={{ maxHeight: 400, overflow: "auto" }}>
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '40px 0' }}>
+          <div style={{ textAlign: "center", padding: "40px 0" }}>
             <Spin size="large" />
             <div style={{ marginTop: 12 }}>
               <Text type="secondary">Đang tải thông báo...</Text>
             </div>
           </div>
         ) : error ? (
-          <div style={{ padding: '20px' }}>
+          <div style={{ padding: "20px" }}>
             <Alert
               message="Lỗi tải thông báo"
               description={error}
@@ -191,12 +203,17 @@ const NotificationList = ({ onClose }) => {
                 </Button>
               }
             />
+            <div style={{ marginTop: 16, textAlign: "center" }}>
+              <Text type="secondary">
+                Đang hiển thị {notifications.length} thông báo đã tải trước đó
+              </Text>
+            </div>
           </div>
         ) : notifications.length === 0 ? (
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
             description="Không có thông báo"
-            style={{ padding: '40px 0' }}
+            style={{ padding: "40px 0" }}
           />
         ) : (
           <List
@@ -204,12 +221,12 @@ const NotificationList = ({ onClose }) => {
             renderItem={(item) => (
               <List.Item
                 style={{
-                  padding: '12px 16px',
-                  borderBottom: '1px solid #f0f0f0',
-                  background: item.isRead ? 'white' : '#f0f8ff',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  borderLeft: item.isRead ? 'none' : '3px solid #1890ff'
+                  padding: "12px 16px",
+                  borderBottom: "1px solid #f0f0f0",
+                  background: item.isRead ? "white" : "#f0f8ff",
+                  cursor: "pointer",
+                  transition: "all 0.2s",
+                  borderLeft: item.isRead ? "none" : "3px solid #1890ff",
                 }}
                 onClick={() => handleNotificationClick(item)}
                 actions={[
@@ -237,7 +254,7 @@ const NotificationList = ({ onClose }) => {
                       deleteNotification(item._id);
                     }}
                     title="Xóa thông báo"
-                  />
+                  />,
                 ].filter(Boolean)}
               >
                 <List.Item.Meta
@@ -246,24 +263,24 @@ const NotificationList = ({ onClose }) => {
                     <div style={{ marginBottom: 4 }}>
                       <Row align="middle" gutter={[8, 4]} wrap={false}>
                         <Col flex="auto">
-                          <Text 
-                            style={{ 
-                              fontSize: 14, 
+                          <Text
+                            style={{
+                              fontSize: 14,
                               fontWeight: item.isRead ? 400 : 600,
-                              color: item.isRead ? '#666' : '#000',
-                              wordBreak: 'break-word'
+                              color: item.isRead ? "#666" : "#000",
+                              wordBreak: "break-word",
                             }}
                           >
                             {item.title}
                           </Text>
                         </Col>
                         <Col>
-                          <Tag 
-                            color={getNotificationColor(item.type)} 
+                          <Tag
+                            color={getNotificationColor(item.type)}
                             size="small"
                             style={{ fontSize: 10, margin: 0 }}
                           >
-                            {item.type || 'system'}
+                            {item.type}
                           </Tag>
                         </Col>
                       </Row>
@@ -271,35 +288,41 @@ const NotificationList = ({ onClose }) => {
                   }
                   description={
                     <div>
-                      <Text 
-                        style={{ 
-                          fontSize: 13, 
-                          display: 'block',
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          display: "block",
                           marginBottom: 4,
                           lineHeight: 1.4,
-                          wordBreak: 'break-word'
+                          wordBreak: "break-word",
                         }}
                       >
                         {item.message}
                       </Text>
                       <Row justify="space-between" align="middle">
                         <Col>
-                          <Text 
-                            type="secondary" 
-                            style={{ fontSize: 11 }}
-                          >
+                          <Text type="secondary" style={{ fontSize: 11 }}>
                             {formatTime(item.createdAt)}
                           </Text>
                         </Col>
-                        {item.priority && item.priority !== 'normal' && (
+                        {item.priority && item.priority !== "normal" && (
                           <Col>
-                            <Tag 
-                              color={item.priority === 'high' ? 'red' : 
-                                     item.priority === 'medium' ? 'orange' : 'blue'} 
+                            <Tag
+                              color={
+                                item.priority === "high"
+                                  ? "red"
+                                  : item.priority === "medium"
+                                  ? "orange"
+                                  : "blue"
+                              }
                               size="small"
                               style={{ fontSize: 9, margin: 0 }}
                             >
-                              {item.priority}
+                              {item.priority === "high"
+                                ? "Cao"
+                                : item.priority === "medium"
+                                ? "Trung bình"
+                                : "Thấp"}
                             </Tag>
                           </Col>
                         )}
@@ -314,18 +337,20 @@ const NotificationList = ({ onClose }) => {
       </div>
 
       {/* Footer */}
-      {!loading && !error && (
+      {!loading && !error && notifications.length > 0 && (
         <>
           <Divider style={{ margin: 0 }} />
-          <div style={{ 
-            padding: 12, 
-            textAlign: 'center',
-            background: '#fafafa',
-            borderBottomLeftRadius: 8,
-            borderBottomRightRadius: 8
-          }}>
+          <div
+            style={{
+              padding: 12,
+              textAlign: "center",
+              background: "#fafafa",
+              borderBottomLeftRadius: 8,
+              borderBottomRightRadius: 8,
+            }}
+          >
             <Text type="secondary" style={{ fontSize: 12 }}>
-              {notifications.length} thông báo • {unreadCount} chưa đọc
+              Hiển thị {notifications.length} thông báo • {unreadCount} chưa đọc
             </Text>
           </div>
         </>
