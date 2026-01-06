@@ -64,14 +64,14 @@ const TeamChat = ({ team, currentUser, onClose }) => {
   }, [team._id]);
 
   useEffect(() => {
-   const token = localStorage.getItem(STORAGE_TOKEN_KEY) || sessionStorage.getItem(STORAGE_TOKEN_KEY);
-  console.log("🔑 Token gửi lên Socket:", token); // THÊM LOG NÀY
+    const token = localStorage.getItem(STORAGE_TOKEN_KEY) || sessionStorage.getItem(STORAGE_TOKEN_KEY);
+    console.log("🔑 Token gửi lên Socket:", token); // THÊM LOG NÀY
 
-  const s = io(SOCKET_URL, {
-    transports: ["websocket"],
-    auth: { token }, // Gửi token vào đây
-    query: { userId: currentUser.id, teamId: team._id },
-  });
+    const s = io(SOCKET_URL, {
+      transports: ["websocket"],
+      auth: { token }, // Gửi token vào đây
+      query: { userId: currentUser.id, teamId: team._id },
+    });
 
     socketRef.current = s;
 
@@ -151,15 +151,15 @@ const TeamChat = ({ team, currentUser, onClose }) => {
   const handleSendMessage = () => {
     const s = socketRef.current;
     const text = newMessage.trim();
-     console.log(">>> Kiểm tra trước khi gửi:", { 
-    socketConnected: s?.connected, 
-    socketId: s?.id,
-    text: text 
-  });
-  if (!text || !s?.connected) {
-    console.error(">>> Gửi thất bại: Socket chưa connect hoặc tin nhắn rỗng");
-    return;
-  }
+    console.log(">>> Kiểm tra trước khi gửi:", {
+      socketConnected: s?.connected,
+      socketId: s?.id,
+      text: text
+    });
+    if (!text || !s?.connected) {
+      console.error(">>> Gửi thất bại: Socket chưa connect hoặc tin nhắn rỗng");
+      return;
+    }
     // if (!text || !s?.connected) return;
 
     const tempId = `temp_${Date.now()}`;
@@ -280,7 +280,7 @@ const TeamChat = ({ team, currentUser, onClose }) => {
           Đóng
         </Button>
       }
-      style={{ height: 600, display: "flex", flexDirection: "column" }}
+      style={{  display: "flex", flexDirection: "column" }}
       bodyStyle={{ flex: 1, display: "flex", flexDirection: "column", padding: 0 }}
     >
       <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
