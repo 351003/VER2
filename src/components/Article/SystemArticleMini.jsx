@@ -87,7 +87,7 @@ const PosterBell = () => {
 
 const wrapperStyle = {
   position: "fixed",
-  top: 90, // 👈 dưới Header
+  top: 200, // 👈 dưới Header
   right: 24,
   zIndex: 999999,
   cursor: "pointer",
