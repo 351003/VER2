@@ -14,7 +14,16 @@ import {
   DashboardOutlined
 } from '@ant-design/icons';
 
-const TeamCard = ({ team, onView, onEdit, onDelete, onChat, user, onToggleActive }) => {
+const TeamCard = ({ 
+  team, 
+  onView, 
+  onEdit, 
+  onDelete, 
+  onChat, 
+  user, 
+  onToggleActive,
+  members = [] 
+}) => {
   const handleCardClick = (e) => {
     if (e.target.closest('.ant-card-actions') || e.target.closest('.ant-dropdown-trigger') || e.target.closest('.ant-btn') || e.target.closest('.ant-switch')) return;
     onView(team);
@@ -118,6 +127,23 @@ const TeamCard = ({ team, onView, onEdit, onDelete, onChat, user, onToggleActive
     return date.toLocaleDateString('vi-VN');
   };
 
+  // Lọc và ánh xạ thông tin thành viên từ mảng members dựa trên team.listUser (ID)
+  const getTeamMembers = () => {
+    if (!team.listUser || !Array.isArray(team.listUser) || team.listUser.length === 0) {
+      return [];
+    }
+    
+    if (!members || !Array.isArray(members)) {
+      return [];
+    }
+    
+    return members.filter(member => 
+      team.listUser.includes(member._id || member.id)
+    );
+  };
+
+  const teamMembers = getTeamMembers();
+
   return (
     <Card
       style={{
@@ -217,7 +243,7 @@ const TeamCard = ({ team, onView, onEdit, onDelete, onChat, user, onToggleActive
         </div>
 
         {/* Members Preview */}
-        {team.listUser && team.listUser.length > 0 && (
+        {teamMembers.length > 0 && (
           <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #f0f0f0' }}>
             <div style={{ fontSize: '11px', color: '#999', marginBottom: 6 }}>
               Thành viên:
@@ -232,25 +258,34 @@ const TeamCard = ({ team, onView, onEdit, onDelete, onChat, user, onToggleActive
                 cursor: 'pointer'
               }}
             >
-              {team.listUser.slice(0, 5).map((userId, index) => (
-                <Tooltip key={index} title={`User ID: ${userId}`} placement="top">
+              {teamMembers.slice(0, 5).map((member, index) => (
+                <Tooltip 
+                  key={member._id || member.id || index} 
+                  title={`${member.fullName || member.name || 'Chưa có tên'}`} 
+                  placement="top"
+                >
                   <Avatar 
-                    icon={<UserOutlined />} 
+                    src={member.avatar}  // Hiển thị avatar nếu có
+                    icon={!member.avatar && <UserOutlined />} 
                     style={{ 
                       border: '2px solid #fff',
-                      background: `#${((userId || '').toString().substring(0, 6) + '999999').substring(0, 6)}`
+                      background: member.avatar ? 'transparent' : `#${((member._id || '').toString().substring(0, 6) + '999999').substring(0, 6)}`
                     }}
-                  />
+                  >
+                    {/* Hiển thị chữ cái đầu nếu không có avatar */}
+                    {!member.avatar && (member.fullName || member.name || 'U').charAt(0).toUpperCase()}
+                  </Avatar>
                 </Tooltip>
               ))}
             </Avatar.Group>
-            {team.listUser.length > 5 && (
+            {teamMembers.length > 5 && (
               <span style={{ fontSize: '11px', color: '#999', marginLeft: 8 }}>
-                +{team.listUser.length - 5} người khác
+                +{teamMembers.length - 5} người khác
               </span>
             )}
           </div>
         )}
+        
       </div>
     </Card>
   );

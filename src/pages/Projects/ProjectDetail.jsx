@@ -781,7 +781,7 @@ const ProjectDetailContent = () => {
         <Col xs={12} sm={6}>
           <Card>
             <Statistic
-              title="Tỷ lệ hoàn thành"
+              title="Công việc hoàn thành"
               value={completionRate}
               suffix="%"
               valueStyle={{

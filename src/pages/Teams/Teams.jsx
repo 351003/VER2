@@ -388,6 +388,7 @@ const Teams = () => {
                 <TeamCard
                   team={team}
                   user={user}
+                  members={users}
                   onView={handleViewTeam}
                   onEdit={handleEditTeam}
                   onDelete={handleDeleteTeam}
