@@ -13,13 +13,15 @@ import {
   Descriptions,
   Divider,
   Breadcrumb,
+  
   Typography,
   Button,
   Table,
   Timeline,
   Badge,
   Spin,
-  message
+  message,
+  Modal
 } from 'antd';
 import {
   TeamOutlined,
@@ -27,15 +29,18 @@ import {
   CalendarOutlined,
   ProjectOutlined,
   MessageOutlined,
+  PoweroffOutlined,
   EditOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
-  ArrowLeftOutlined
+  ArrowLeftOutlined,
+  LinkOutlined
 } from '@ant-design/icons';
 import { teamService } from '../../services/teamService';
+import projectService from '../../services/projectService';
 import userService from '../../services/userService';
 import { useAuth } from '../../contexts/AuthContext';
-
+import TeamForm from '../../components/Teams/TeamForm';
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
 
@@ -48,10 +53,79 @@ const TeamDetail = () => {
   const [leaderInfo, setLeaderInfo] = useState(null);
   const [managerInfo, setManagerInfo] = useState(null);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [editingTeam, setEditingTeam] = useState(null);
+   const [users, setUsers] = useState([]);
+  const [formLoading, setFormLoading] = useState(false);
+  const [projectInfo, setProjectInfo] = useState(null); // Thêm state cho project info
+  const [loadingProject, setLoadingProject] = useState(false); // Thêm loading cho project
   const { user } = useAuth(); // Thêm user từ AuthContext
   useEffect(() => {
     loadTeamDetail();
+    loadUsers();
+
   }, [id]);
+  // Thêm các hàm load users và projects
+  const loadUsers = async () => {
+    try {
+      const response = await userService.getUsers({
+        page: 1,
+        limit: 100,
+      });
+
+      if (response.success) {
+        setUsers(
+          response.data.map((u) => ({
+            id: u._id,
+            name: u.fullName,
+            email: u.email,
+            avatar: u.avatar,
+          }))
+        );
+      }
+    } catch (error) {
+      console.error('Lỗi khi tải danh sách user:', error);
+    }
+  };
+
+  // Thêm hàm load project info
+  const loadProjectInfo = async (projectId) => {
+    if (!projectId) return;
+    
+    setLoadingProject(true);
+    try {
+      // Giả sử bạn có endpoint /projects/detail/:id hoặc /projects/:id
+      const response = await projectService.getProjectDetail(projectId);
+      
+      if (response.success && response.data) {
+        setProjectInfo({
+          id: response.data._id,
+          title: response.data.title,
+          description: response.data.description,
+          status: response.data.status
+        });
+      } else {
+        // Nếu không lấy được, vẫn hiển thị ID
+        setProjectInfo({
+          id: projectId,
+          title: `Dự án ID: ${projectId.substring(0, 8)}...`,
+          description: 'Không có mô tả',
+          status: 'unknown'
+        });
+      }
+    } catch (error) {
+      console.error('Lỗi khi tải thông tin dự án:', error);
+      // Nếu lỗi, vẫn hiển thị ID
+      setProjectInfo({
+        id: projectId,
+        title: `Dự án ID: ${projectId.substring(0, 8)}...`,
+        description: 'Không tải được thông tin',
+        status: 'error'
+      });
+    } finally {
+      setLoadingProject(false);
+    }
+  };
 
   const loadTeamDetail = async () => {
     setLoading(true);
@@ -69,6 +143,10 @@ const TeamDetail = () => {
         if (teamData.manager) {
           loadUserInfo(teamData.manager, setManagerInfo);
         }
+        // Load project info nếu có project_id
+        if (teamData.project_id) {
+          loadProjectInfo(teamData.project_id);
+        }
         
         // Load members info
         if (teamData.listUser && teamData.listUser.length > 0) {
@@ -84,6 +162,38 @@ const TeamDetail = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Thêm hàm xử lý chỉnh sửa
+  const handleEditClick = () => {
+    setEditingTeam(team);
+    setModalVisible(true);
+  };
+
+  // Thêm hàm xử lý cập nhật team
+  const handleUpdateTeam = async (values) => {
+    try {
+      setFormLoading(true);
+      const response = await teamService.updateTeam(id, values);
+
+      if (response.code === 200) {
+        message.success('Cập nhật nhóm thành công!');
+        setModalVisible(false);
+        setEditingTeam(null);
+        loadTeamDetail(); // Reload thông tin team
+      } else {
+        message.error(response.message || 'Lỗi khi cập nhật nhóm');
+      }
+    } catch (error) {
+      message.error('Lỗi khi cập nhật nhóm: ' + error.message);
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleModalCancel = () => {
+    setModalVisible(false);
+    setEditingTeam(null);
   };
 
   const loadUserInfo = async (userId, setter) => {
@@ -107,6 +217,20 @@ const TeamDetail = () => {
         email: 'N/A',
         avatar: null
       });
+    }
+  };
+  const handleToggleActive = async (isActive) => {
+    try {
+      const response = await teamService.toggleActive(id, isActive);
+      
+      if (response.code === 200) {
+        message.success(`Đã ${isActive ? "kích hoạt" : "tạm dừng"} nhóm thành công!`);
+        loadTeamDetail(); // Reload thông tin team
+      } else {
+        message.error(response.message || "Lỗi khi cập nhật trạng thái");
+      }
+    } catch (error) {
+      message.error("Lỗi khi cập nhật trạng thái: " + error.message);
     }
   };
 
@@ -202,12 +326,6 @@ const TeamDetail = () => {
         return <Tag>Member</Tag>;
       }
     },
-    {
-      title: 'ID',
-      dataIndex: 'id',
-      key: 'id',
-      render: (id) => <Text code>{id.substring(0, 8)}...</Text>
-    }
   ];
 
   return (
@@ -246,11 +364,21 @@ const TeamDetail = () => {
           </div>
 
           <Space>
-            <Button icon={<MessageOutlined />} onClick={() => navigate(`/teams/${team._id}/chat`)}>
-              Nhắn tin nhóm
-            </Button>
-            {(team.leader === user?.id || team.manager === user?.id || user?.role === 'manager') && (
-              <Button icon={<EditOutlined />} type="primary" onClick={() => navigate(`/teams/${team._id}/edit`)}>
+            {/* Chỉ hiển thị nút toggle active khi có quyền */}
+            {(team.leader === user?.id || team.manager === user?.id || user?.role.toUpperCase() === 'MANAGER') && (
+              <Button 
+                icon={<PoweroffOutlined />}
+                onClick={() => handleToggleActive(!team.isActive)}
+                type={team.isActive ? "default" : "primary"}
+                danger={team.isActive}
+              >
+                {team.isActive ? "Tạm dừng" : "Kích hoạt"}
+              </Button>
+            )}
+            
+            {/* Sửa nút Chỉnh sửa để mở modal thay vì navigate */}
+            {(team.leader === user?.id || team.manager === user?.id || user?.role.toUpperCase() === 'MANAGER') && (
+              <Button icon={<EditOutlined />} type="primary" onClick={handleEditClick}>
                 Chỉnh sửa
               </Button>
             )}
@@ -305,14 +433,61 @@ const TeamDetail = () => {
           {/* Team Information */}
           <Card title="Thông tin nhóm" style={{ marginBottom: 16 }}>
             <Descriptions column={1} size="small">
-              <Descriptions.Item label="ID nhóm">
+              {/* <Descriptions.Item label="ID nhóm">
                 <Text copyable>{team._id}</Text>
-              </Descriptions.Item>
-              <Descriptions.Item label="ID dự án">
+              </Descriptions.Item> */}
+              <Descriptions.Item label="Dự án">
                 {team.project_id ? (
-                  <Text copyable>{team.project_id}</Text>
+                  loadingProject ? (
+                    <Spin size="small" />
+                  ) : projectInfo ? (
+                    <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                      <div>
+                        <ProjectOutlined style={{ color: '#1890ff', marginRight: 6 }} />
+                        <Text strong>{projectInfo.title}</Text>
+                      </div>
+                      <div>
+                        {/* <Tag color={
+                          projectInfo.status === 'active' ? 'success' : 
+                          projectInfo.status === 'completed' ? 'blue' : 
+                          projectInfo.status === 'pending' ? 'orange' : 'default'
+                        } size="small">
+                          {projectInfo.status === 'active' ? 'Đang thực hiện' : 
+                           projectInfo.status === 'completed' ? 'Hoàn thành' : 
+                           projectInfo.status === 'pending' ? 'Chờ xử lý' : 
+                           projectInfo.status}
+                        </Tag> */}
+                        <Button 
+                          type="link" 
+                          size="small" 
+                          icon={<LinkOutlined />}
+                          onClick={() => navigate(`/projects/detail/${projectInfo.id}`)}
+                          style={{ padding: 0, marginLeft: 8 }}
+                        >
+                          Xem dự án
+                        </Button>
+                      </div>
+                      {/* <Text type="secondary" style={{ fontSize: '11px' }}>
+                        ID: {team.project_id.substring(0, 8)}...
+                      </Text> */}
+                    </Space>
+                  ) : (
+                    <Space>
+                      <ProjectOutlined style={{ color: '#666', marginRight: 6 }} />
+                      <Text copyable>{team.project_id.substring(0, 8)}...</Text>
+                      <Button 
+                        type="link" 
+                        size="small" 
+                        icon={<LinkOutlined />}
+                        onClick={() => navigate(`/projects/${team.project_id}`)}
+                        style={{ padding: 0 }}
+                      >
+                        Xem dự án
+                      </Button>
+                    </Space>
+                  )
                 ) : (
-                  <Text type="secondary">Không có</Text>
+                  <Text type="secondary">Không có dự án</Text>
                 )}
               </Descriptions.Item>
               <Descriptions.Item label="Trưởng nhóm">
@@ -401,7 +576,7 @@ const TeamDetail = () => {
                   <Descriptions.Item label="Số thành viên">
                     {team.listUser?.length || 0}
                   </Descriptions.Item>
-                  <Descriptions.Item label="Leader ID">
+                  {/* <Descriptions.Item label="Leader ID">
                     <Text copyable>{team.leader}</Text>
                   </Descriptions.Item>
                   <Descriptions.Item label="Manager ID">
@@ -417,7 +592,7 @@ const TeamDetail = () => {
                     ) : (
                       <Text type="secondary">Không có</Text>
                     )}
-                  </Descriptions.Item>
+                  </Descriptions.Item> */}
                 </Descriptions>
               </TabPane>
 
@@ -443,6 +618,25 @@ const TeamDetail = () => {
           </Card>
         </Col>
       </Row>
+    {/* Modal Form Chỉnh sửa */}
+      <Modal
+        title="Chỉnh sửa nhóm"
+        open={modalVisible}
+        onCancel={handleModalCancel}
+        footer={null}
+        width={600}
+        destroyOnClose
+      >
+        <TeamForm
+          visible={modalVisible}
+          onCancel={handleModalCancel}
+          onFinish={handleUpdateTeam}
+          initialValues={editingTeam}
+          loading={formLoading}
+          users={users}
+          editingTeam={editingTeam}
+        />
+      </Modal>
     </div>
   );
 };

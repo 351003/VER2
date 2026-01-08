@@ -205,6 +205,7 @@ const Teams = () => {
     });
   };
 
+  // Thêm hàm handleToggleActive
   const handleToggleActive = async (teamId, isActive) => {
     try {
       const response = await teamService.toggleActive(teamId, isActive);
@@ -391,6 +392,7 @@ const Teams = () => {
                   onEdit={handleEditTeam}
                   onDelete={handleDeleteTeam}
                   onChat={handleChatTeam}
+                  onToggleActive={handleToggleActive}
                 />
               </Col>
             ))}
