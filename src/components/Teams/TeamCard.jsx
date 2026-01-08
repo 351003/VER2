@@ -31,18 +31,67 @@ const TeamCard = ({
 
   const canEditOrDelete = () => {
     if (!user) return false;
-    if (user.role.toUpperCase() === 'MANAGER') return true;
-    return team.leader === user.id || team.manager === user.id;
-  };
+    if (user.role.toUpperCase() === 'MANAGER') {
+      return true;
+    }
+    // Lấy ID của user
+  const userId = user._id || user.id;
+  if (!userId) return false;
+  
+  // Kiểm tra user có phải là leader không
+  // Xử lý cả trường hợp leader là object hoặc string
+  if (team.leader) {
+    const leaderId = team.leader._id || team.leader.id || team.leader;
+    if (leaderId === userId) return true;
+  }
+  
+  // Kiểm tra user có phải là manager không
+  if (team.manager) {
+    const managerId = team.manager._id || team.manager.id || team.manager;
+    if (managerId === userId) return true;
+  }
+  
+  // Kiểm tra user có phải là người tạo team (createdBy)
+  if (team.createdBy) {
+    const createdById = team.createdBy._id || team.createdBy.id || team.createdBy;
+    if (createdById === userId) return true;
+  }
+  
+  return false;
+};
+
 
   // Kiểm tra quyền toggle active
   const canToggleActive = () => {
     if (!user) return false;
     // Manager và Admin có toàn quyền
-    if (user.role.toUpperCase() === 'MANAGER') return true;
-    // Leader hoặc Manager của team
-    return team.leader === user.id || team.manager === user.id;
-  };
+    if (user.role.toUpperCase() === 'MANAGER') {
+      return true;
+    }
+    // Lấy ID của user
+  const userId = user._id || user.id;
+  if (!userId) return false;
+  
+  // Leader, Manager, hoặc người tạo team
+  if (team.leader) {
+    const leaderId = team.leader._id || team.leader.id || team.leader;
+    if (leaderId === userId) return true;
+  }
+  
+  if (team.manager) {
+    const managerId = team.manager._id || team.manager.id || team.manager;
+    if (managerId === userId) return true;
+  }
+  
+  if (team.createdBy) {
+    const createdById = team.createdBy._id || team.createdBy.id || team.createdBy;
+    if (createdById === userId) return true;
+  }
+  
+  return false;
+};
+
+  
 
   const getMenuItems = () => {
     const items = [
@@ -72,15 +121,15 @@ const TeamCard = ({
       items.push({ type: 'divider' });
     }
 
-    // Thêm Xóa nhóm nếu có quyền
-    if (canEditOrDelete()) {
-      items.push({ 
-        key: 'delete', 
-        icon: <DeleteOutlined />, 
-        label: 'Xóa nhóm', 
-        danger: true 
-      });
-    }
+    // // Thêm Xóa nhóm nếu có quyền
+    // if (canEditOrDelete()) {
+    //   items.push({ 
+    //     key: 'delete', 
+    //     icon: <DeleteOutlined />, 
+    //     label: 'Xóa nhóm', 
+    //     danger: true 
+    //   });
+    // }
 
     return items;
   };

@@ -394,6 +394,9 @@ const Teams = () => {
                   onDelete={handleDeleteTeam}
                   onChat={handleChatTeam}
                   onToggleActive={handleToggleActive}
+                  // canEdit={checkTeamPermission(team, 'edit')}
+                  //   canDelete={checkTeamPermission(team, 'delete')}
+                  //   canToggleActive={checkTeamPermission(team, 'toggleActive')}
                 />
               </Col>
             ))}
